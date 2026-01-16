@@ -8,11 +8,14 @@
 
 -main ax3.Main
 
--java java_out
--D jvm
+# --- MODERNIZATION FIX ---
+# Instead of generating to a folder and copying (which fails on Windows),
+# we compile directly to the final JAR using the new Haxe 4.3 syntax.
+--jvm converter.jar
 
-# -debug
-# -cmd cp java_out/Main-debug.jar converter.jar
--cmd cp java_out/Main.jar converter.jar
+# --- OLD CONFIG (Commented out) ---
+# -java java_out
+# -D jvm
+# -cmd cp java_out/Main.jar converter.jar
 
 # -cmd java -jar converter.jar config-local.json
