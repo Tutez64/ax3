@@ -1,0 +1,69 @@
+# ax3 Codebase Guide for AI Agents
+
+## Overview
+ax3 is an ActionScript 3 (AS3) to Haxe converter. It functions similarly to a compiler: parsing AS3 code, resolving types (including from SWC libraries), applying transformation filters, and generating Haxe code.
+
+## Architecture
+The conversion pipeline is sequential and defined in `src/ax3/Main.hx`:
+1. **Parsing**: AS3 source files are parsed into a `ParseTree` (`src/ax3/Parser.hx`).
+2. **SWC Loading**: External types are loaded from SWC files into the `TypedTree` (`src/ax3/SWCLoader.hx`).
+3. **Typing**: The `ParseTree` is processed into a `TypedTree`, resolving imports and types (`src/ax3/Typer.hx`, `src/ax3/ExprTyper.hx`).
+4. **Filtering**: A series of filters modify the `TypedTree` to adapt AS3 patterns to Haxe (`src/ax3/Filters.hx`).
+5. **Generation**: Haxe code is generated from the modified `TypedTree` (`src/ax3/GenHaxe.hx`).
+
+### Key Data Structures
+*   **ParseTree** (`src/ax3/ParseTree.hx`): Represents the raw AST of AS3 code.
+*   **TypedTree** (`src/ax3/TypedTree.hx`): A semantic graph of the code with resolved types and symbols. This is the primary structure manipulated by filters.
+*   **Token** (`src/ax3/Token.hx`): Represents lexical tokens, preserving whitespace/comments (trivia) for high-fidelity code generation.
+
+## Critical Workflows
+
+### Building
+*   **Command**: `npx haxe build.hxml`
+*   **Output**: `converter.jar` (JVM target).
+*   **Dependencies**: Requires `lix` for Haxe version management (`npm i lix`, `npx lix download`).
+
+### Running
+*   **Command**: `java -jar converter.jar config.json`
+*   **Config**: JSON file specifying `src` (AS3 sources), `hxout` (Haxe output dir), and `swc` (libraries).
+
+### Debugging/Testing
+*   **Compat Tests**: `test-compat.hxml` runs compatibility tests.
+*   **Debugging**: `src/ax3/ParseTreeDump.hx` can dump ASTs. `TypedTree.dump()` can visualize the semantic tree.
+
+## Project Patterns & Conventions
+
+### Language & Versioning
+*   **Language**: All code, filenames, and comments must be in **English**.
+    *   *Exception*: Respond to the user in their preferred language (e.g., French) to facilitate communication.
+*   **Haxe Version**: The project uses **Haxe 4.3.7**.
+    *   Write modern code compatible with **Haxe 5.0.0**.
+    *   Be aware that existing code may be legacy and not reflect current best practices.
+
+### AST & Typing
+*   **Trivia Preservation (Crucial)**: The parser attaches leading/trailing whitespace/comments to tokens (`Token.leadTrivia`, `Token.trailTrivia`).
+    *   **Rule**: Transformations **must** preserve these to maintain formatting. When replacing a token or node, transfer the trivia from the old token to the new one.
+    *   **Tools**: Use `TypedTreeTools.removeLeadingTrivia(expr)` and `removeTrailingTrivia(expr)` to extract and move trivia before replacing nodes.
+    *   **Structure**: `Trivia` is an enum (`TrWhitespace`, `TrNewline`, `TrBlockComment`, `TrLineComment`).
+*   **Type Resolution**: `Typer` and `ExprTyper` handle type inference. `Context` holds global state.
+*   **Immutable-ish AST**: `TypedTreeTools.mk` and `WithMacro.with` are used to create modified copies of AST nodes, though the tree structure itself is mutable during filtering.
+
+### Filters (`src/ax3/filters/`)
+*   **Structure**: Filters implement a `run(tree:TypedTree)` method.
+*   **Pattern**: Most filters iterate over the `TypedTree`, identify specific patterns (e.g., `RewriteForIn`), and mutate the tree or replace nodes.
+*   **Example**: `RewriteVectorDecl.hx` transforms `new Vector.<T>` to Haxe syntax.
+
+### External Dependencies
+*   **format**: Used for reading SWC/SWF files (`format.swf.Reader`).
+*   **haxe-type**: Special annotation `@haxe-type` in comments allows manual type overrides in AS3 sources.
+
+## Integration Points
+*   **SWC Loading**: `SWCLoader` maps AS3 built-ins (like `Object`, `Array`) to internal types (`tUntypedObject`, `tUntypedArray`) or Haxe equivalents.
+*   **Haxe Generation**: `GenHaxe` handles the final printing, including specific Haxe constructs (e.g., `cast`, `Std.int`).
+
+## Essential Files
+*   `src/ax3/Main.hx`: Entry point and pipeline definition.
+*   `src/ax3/TypedTree.hx`: Core semantic model definition.
+*   `src/ax3/ExprTyper.hx`: Logic for typing expressions.
+*   `src/ax3/GenHaxe.hx`: Haxe code printer.
+*   `src/ax3/Filters.hx`: Registry of all transformation filters.
