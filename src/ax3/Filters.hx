@@ -29,6 +29,7 @@ class Filters {
 			new HandleNew(context),
 			new RewriteVectorDecl(context),
 			new AddSuperCtorCall(context),
+			new RemoveRedundantSuperCtorCall(context),
 			new RewriteBlockBinops(context),
 			new RewriteNewArray(context),
 			new RewriteTypesWithComment(context),

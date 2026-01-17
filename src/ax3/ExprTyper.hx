@@ -267,18 +267,23 @@ class ExprTyper {
 			return if (currentClass != null) currentClass else throw '`$subj` used outside of class';
 		}
 
-		inline function getSuperClass() {
+		inline function getSuperClassOrNull():Null<TClassOrInterfaceDecl> {
 			return switch getCurrentClass("super").kind {
 				case TClass(info):
-					if (info.extend == null) throwErr("`super` used with no super-class", i.pos);
-					info.extend.superClass;
+					if (info.extend == null) null else info.extend.superClass;
 				case _: throw "not a class";
 			}
 		}
 
 		return switch i.text {
 			case "this": mk(TELiteral(TLThis(i)), TTInst(getCurrentClass("this")), expectedType);
-			case "super": mk(TELiteral(TLSuper(i)), TTInst(getSuperClass()), expectedType);
+			case "super":
+				var superClass = getSuperClassOrNull();
+				if (superClass == null) {
+					mk(TELiteral(TLSuper(i)), TTAny, expectedType);
+				} else {
+					mk(TELiteral(TLSuper(i)), TTInst(superClass), expectedType);
+				}
 			case "true" | "false": mk(TELiteral(TLBool(i)), TTBoolean, expectedType);
 			case "null": mk(TELiteral(TLNull(i)), TTAny, expectedType);
 			case "undefined": mk(TELiteral(TLUndefined(i)), TTAny, expectedType);
