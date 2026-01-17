@@ -5,7 +5,7 @@ ax3 is an ActionScript 3 (AS3) to Haxe converter. It functions similarly to a co
 
 ## Architecture
 The conversion pipeline is sequential and defined in `src/ax3/Main.hx`:
-1. **Parsing**: AS3 source files are parsed into a `ParseTree` (`src/ax3/Parser.hx`).
+1. **Parsing**: AS3 source files are parsed into a `ParseTree` via the typing pass (`Typer.process`), which uses `src/ax3/Parser.hx` internally.
 2. **SWC Loading**: External types are loaded from SWC files into the `TypedTree` (`src/ax3/SWCLoader.hx`).
 3. **Typing**: The `ParseTree` is processed into a `TypedTree`, resolving imports and types (`src/ax3/Typer.hx`, `src/ax3/ExprTyper.hx`).
 4. **Filtering**: A series of filters modify the `TypedTree` to adapt AS3 patterns to Haxe (`src/ax3/Filters.hx`).
@@ -26,9 +26,18 @@ The conversion pipeline is sequential and defined in `src/ax3/Main.hx`:
 ### Running
 *   **Command**: `java -jar converter.jar config.json`
 *   **Config**: JSON file specifying `src` (AS3 sources), `hxout` (Haxe output dir), and `swc` (libraries).
+    *   **Optional**: `haxeTypes`, `dataout`, `rootImports`.
 
-### Debugging/Testing
-*   **Compat Tests**: `test-compat.hxml` runs compatibility tests.
+### Testing
+*   **Compat Tests**: `npx haxe test-compat.hxml` runs compatibility tests (JS then SWF via `--next`).
+    *   Validates the `compat/` library (ASAny, ASDictionary, XML, etc.).
+*   **Playground/Repro Tests**: `tests/` directory.
+    *   Use this folder to create isolated reproduction cases for converter bugs or features.
+    *   Structure: `tests/src/` (AS3 input), `tests/out/` (Haxe output), `tests/config.json`.
+    *   **Requirement**: Each test file in `tests/src/` **must** include comments explaining the test case and expected behavior (see `tests/src/TestSuper.as` for example).
+    *   Run: `java -jar converter.jar tests/config.json`.
+
+### Debugging
 *   **Debugging**: `src/ax3/ParseTreeDump.hx` can dump ASTs. `TypedTree.dump()` can visualize the semantic tree.
 
 ## Project Patterns & Conventions
@@ -55,7 +64,7 @@ The conversion pipeline is sequential and defined in `src/ax3/Main.hx`:
 
 ### External Dependencies
 *   **format**: Used for reading SWC/SWF files (`format.swf.Reader`).
-*   **haxe-type**: Special annotation `@haxe-type` in comments allows manual type overrides in AS3 sources.
+*   **haxe-type**: Special annotation `@haxe-type` in comments allows manual type overrides in AS3 sources (add it in source code when needed).
 
 ## Integration Points
 *   **SWC Loading**: `SWCLoader` maps AS3 built-ins (like `Object`, `Array`) to internal types (`tUntypedObject`, `tUntypedArray`) or Haxe equivalents.
