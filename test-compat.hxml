@@ -12,7 +12,7 @@
 --remap flash:openfl
 -D analyzer-optimize
 
--cmd node test.js
+-cmd node -r ./compat-test/shim.js test.js
 
 --next
 

@@ -108,8 +108,7 @@ abstract XML(XMLImpl) from XMLImpl to XMLImpl {
 	}
 	#end
 
-	#if flash inline #end
-	@:to public function toString():String {
+	@:to public #if flash inline #end function toString():String {
 		if (this == null) return null;
 		#if flash
 		return this.toString();
