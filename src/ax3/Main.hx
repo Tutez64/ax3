@@ -181,7 +181,7 @@ class Main {
 			printerr("-=-=-=-=-");
 			printerr(expected);
 			// throw "not the same: " + haxe.Json.stringify(actual);
-			throw '$path not the same';
+			throw new haxe.Exception('$path not the same');
 		}
 	}
 
