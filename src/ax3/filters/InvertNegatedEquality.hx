@@ -10,13 +10,36 @@ class InvertNegatedEquality extends AbstractFilter {
 					processLeadingToken(t -> t.leadTrivia = notToken.leadTrivia.concat(notToken.trailTrivia).concat(t.leadTrivia), a);
 				}
 
-				switch (e2.kind) {
+				var target = e2;
+				var parenLead:Array<Trivia> = [];
+				var parenTrail:Array<Trivia> = [];
+				switch e2.kind {
+					case TEParens(openParen, inner, closeParen):
+						parenLead = openParen.leadTrivia.concat(openParen.trailTrivia);
+						parenTrail = closeParen.leadTrivia.concat(closeParen.trailTrivia);
+						target = inner;
+					case _:
+				}
+
+				switch (target.kind) {
 					case TEBinop(a, OpEquals(t), b):
+						if (parenLead.length > 0) {
+							processLeadingToken(token -> token.leadTrivia = parenLead.concat(token.leadTrivia), target);
+						}
+						if (parenTrail.length > 0) {
+							processTrailingToken(token -> token.trailTrivia = token.trailTrivia.concat(parenTrail), target);
+						}
 						moveTrivia(a);
 						var t = new Token(t.pos, TkExclamationEquals, "!=", t.leadTrivia, t.trailTrivia);
 						e.with(kind = TEBinop(a, OpNotEquals(t), b));
 
 					case TEBinop(a, OpNotEquals(t), b):
+						if (parenLead.length > 0) {
+							processLeadingToken(token -> token.leadTrivia = parenLead.concat(token.leadTrivia), target);
+						}
+						if (parenTrail.length > 0) {
+							processTrailingToken(token -> token.trailTrivia = token.trailTrivia.concat(parenTrail), target);
+						}
 						moveTrivia(a);
 						var t = new Token(t.pos, TkEqualsEquals, "==", t.leadTrivia, t.trailTrivia);
 						e.with(kind = TEBinop(a, OpEquals(t), b));
