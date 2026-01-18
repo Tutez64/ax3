@@ -2,5 +2,6 @@
   "src": "tests/src",
   "hxout": "tests/out",
   "swc": [
+    "tests/lib/airglobal.swc"
   ]
 }

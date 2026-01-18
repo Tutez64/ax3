@@ -35,6 +35,9 @@ The conversion pipeline is sequential and defined in `src/ax3/Main.hx`:
     *   Use this folder to create isolated reproduction cases for converter bugs or features.
     *   Structure: `tests/src/` (AS3 input), `tests/out/` (Haxe output), `tests/config.json`.
     *   **Requirement**: Each test file in `tests/src/` **must** include comments explaining the test case and expected behavior (see `tests/src/TestSuper.as` for example).
+    *   **Error coverage**: Tests should intentionally trigger every non-blocking `reportError` produced by filters; only `throwError` cases are allowed to remain untested until explicitly targeted.
+    *   **`reportError` that throws**: If triggering a `reportError` effectively causes a `throw` (as observed in practice), treat it as a `throwError` case — do not trigger it in tests unless explicitly requested.
+    *   **Compat changes**: You may update `compat/` when needed, but you must update `compat-test/` accordingly and verify with `npx haxe test-compat.hxml`.
     *   Run: `java -jar converter.jar tests/config.json`.
 
 ### Debugging
@@ -61,6 +64,7 @@ The conversion pipeline is sequential and defined in `src/ax3/Main.hx`:
 *   **Structure**: Filters implement a `run(tree:TypedTree)` method.
 *   **Pattern**: Most filters iterate over the `TypedTree`, identify specific patterns (e.g., `RewriteForIn`), and mutate the tree or replace nodes.
 *   **Example**: `RewriteVectorDecl.hx` transforms `new Vector.<T>` to Haxe syntax.
+*   **Error severity**: Filters use `reportError` for non-blocking diagnostics (conversion continues) and `throwError` for critical errors that stop conversion.
 
 ### External Dependencies
 *   **format**: Used for reading SWC/SWF files (`format.swf.Reader`).
