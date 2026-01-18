@@ -178,7 +178,7 @@ class Typer {
 			structureSetups.push(function() {
 				var classDecl = switch resolveDotPath(mod, dotPathToArray(c.extend.path)).kind {
 					case TDClassOrInterface(i) if (i.kind.match(TClass(_))): i;
-					case _: throw "Not a ccass";
+					case _: throw "Not a class";
 				}
 				info.extend = {syntax: c.extend, superClass: classDecl};
 			});
