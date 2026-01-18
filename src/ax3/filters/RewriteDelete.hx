@@ -11,6 +11,9 @@ class RewriteDelete extends AbstractFilter {
 					case TEArrayAccess(a) | TEParens(_, {kind: TEArrayAccess(a)}, _):
 						rewrite(keyword, a, eobj, e);
 
+					case TEField(obj, fieldName, fieldToken) | TEParens(_, {kind: TEField(obj, fieldName, fieldToken)}, _):
+						rewriteFieldDelete(keyword, obj, fieldName, fieldToken, e);
+
 					case _:
 						reportError(exprPos(eobj), "Unsupported `delete` operation");
 						e;
@@ -18,6 +21,39 @@ class RewriteDelete extends AbstractFilter {
 			case _:
 				e;
 		}
+	}
+
+	function rewriteFieldDelete(deleteKeyword:Token, obj:TFieldObject, fieldName:String, fieldToken:Token, eDelete:TExpr):TExpr {
+		var lead = removeLeadingTrivia(eDelete);
+		var trail = removeTrailingTrivia(eDelete);
+		var eDeleteField = mkBuiltin("Reflect.deleteField", tDeleteField, lead);
+		var objectExpr:TExpr;
+		var extraLead:Array<Trivia> = [];
+
+		switch obj.kind {
+			case TOExplicit(dot, eobj):
+				objectExpr = eobj;
+				extraLead = dot.leadTrivia.concat(dot.trailTrivia);
+
+			case TOImplicitThis(_):
+				objectExpr = mk(TELiteral(TLThis(mkIdent("this", fieldToken.leadTrivia, []))), obj.type, obj.type);
+				fieldToken.leadTrivia = [];
+
+			case TOImplicitClass(cls):
+				objectExpr = mkDeclRef({first: mkIdent(cls.name, fieldToken.leadTrivia, []), rest: []}, {name: cls.name, kind: TDClassOrInterface(cls)}, null);
+				fieldToken.leadTrivia = [];
+		}
+
+		var nameToken = new Token(fieldToken.pos, TkStringDouble, haxe.Json.stringify(fieldName), extraLead.concat(fieldToken.leadTrivia), fieldToken.trailTrivia);
+		fieldToken.leadTrivia = [];
+		fieldToken.trailTrivia = [];
+		var eName = mk(TELiteral(TLString(nameToken)), TTString, TTString);
+
+		return mk(TECall(eDeleteField, {
+			openParen: mkOpenParen(),
+			args: [{expr: objectExpr, comma: commaWithSpace}, {expr: eName, comma: null}],
+			closeParen: mkCloseParen(trail)
+		}), TTBoolean, eDelete.expectedType);
 	}
 
 	function rewrite(deleteKeyword:Token, a:TArrayAccess, eDeleteObj:TExpr, eDelete:TExpr):TExpr {
@@ -31,7 +67,7 @@ class RewriteDelete extends AbstractFilter {
 				var eRemoveField = mk(TEField({kind: TOExplicit(mkDot(), a.eobj), type: a.eobj.type}, "remove", mkIdent("remove")), TTFunction, TTFunction);
 				mkCall(eRemoveField, [a.eindex.with(expectedType = keyType)], TTBoolean);
 
-			case [TTObject(_) | TTAny, _] | [_, TTString]:
+			case [TTObject(_), _] | [TTAny, _] | [_, TTString]:
 				// TODO: this should actually generate (expr : ASObject).___delete that handles delection of Dictionary keys too
 				// make sure the expected type is string so further filters add the cast
 				var eindex = if (a.eindex.type != TTString) a.eindex.with(expectedType = TTString) else a.eindex;
@@ -43,8 +79,15 @@ class RewriteDelete extends AbstractFilter {
 				}));
 
 			case [TTXMLList, TTInt | TTUint]:
-				reportError(deleteKeyword.pos, 'TODO: delete on XMLList');
-				mkNullExpr(eDelete.expectedType);
+				var lead = removeLeadingTrivia(eDelete);
+				var trail = removeTrailingTrivia(eDelete);
+				processLeadingToken(function(t) {
+					t.leadTrivia = lead.concat(t.leadTrivia);
+				}, a.eobj);
+
+				var eindex = if (a.eindex.type == TTUint) a.eindex.with(expectedType = TTInt) else a.eindex;
+				var eDeleteAt = mk(TEField({kind: TOExplicit(mkDot(), a.eobj), type: a.eobj.type}, "deleteAt", mkIdent("deleteAt")), TTFunction, TTFunction);
+				mkCall(eDeleteAt, [eindex], TTBoolean, trail).with(expectedType = eDelete.expectedType);
 
 			case [TTArray(_), TTInt | TTUint]:
 				reportError(exprPos(a.eindex), 'delete on array?');

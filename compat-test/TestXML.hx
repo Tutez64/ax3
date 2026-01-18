@@ -46,6 +46,14 @@ class TestXML extends utest.Test {
 		equals("<li>1</li>\n<notli/>\n<li>2</li>", x.children().toXMLString());
 	}
 
+	function testXMLListDelete() {
+		var x = new compat.XML('<root><a/><b/><c/></root>');
+		var list = x.children();
+		isTrue(list.deleteAt(1));
+		equals("<a/>\n<c/>", list.toXMLString());
+		equals("<a/>\n<c/>", x.children().toXMLString());
+	}
+
 	function testLocalName() {
 		var x = new compat.XML('<element/>');
 		equals("element", x.localName());

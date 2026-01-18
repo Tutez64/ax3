@@ -61,6 +61,23 @@ abstract XMLList(XMLListImpl) from XMLListImpl to XMLListImpl {
 		#end
 	}
 
+	public function deleteAt(index:Int):Bool {
+		#if flash
+		return untyped __delete__(this, index);
+		#else
+		if (index < 0 || index >= this.length) {
+			return true;
+		}
+		var node:StdXml = this[index];
+		var parent = node.parent;
+		if (parent != null) {
+			parent.removeChild(node);
+		}
+		this.splice(index, 1);
+		return true;
+		#end
+	}
+
 	@:op([]) inline function get(index:Int):XML {
 		return this[index];
 	}
