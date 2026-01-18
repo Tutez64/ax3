@@ -74,6 +74,7 @@ class ExprTyper {
 
 	public function typeBlock(b:BracedExprBlock):TBlock {
 		pushLocals();
+		predeclareBlockLocals(b);
 		var exprs = [];
 		for (e in b.exprs) {
 			exprs.push({
@@ -86,6 +87,33 @@ class ExprTyper {
 			syntax: {openBrace: b.openBrace, closeBrace: b.closeBrace},
 			exprs: exprs
 		};
+	}
+
+	function predeclareBlockLocals(b:BracedExprBlock) {
+		for (e in b.exprs) {
+			switch e.expr {
+				case EVars(kind, vars):
+					predeclareVars(kind, vars);
+				case EFunction(_, name, _) if (name != null):
+					if (locals[name.text] == null) {
+						addLocal(name.text, TTFunction);
+					}
+				case _:
+			}
+		}
+	}
+
+	function predeclareVars(kind:VarDeclKind, vars:Separated<VarDecl>) {
+		var varToken = switch kind { case VVar(t) | VConst(t): t; };
+		var overrideType = typerContext.haxeTypes.resolveTypeHint(HaxeTypeAnnotation.extract(varToken.leadTrivia), varToken.pos);
+		var decls = separatedToArray(vars, function(v, comma) return v);
+		for (v in decls) {
+			if (locals[v.name.text] != null) {
+				continue;
+			}
+			var type = if (overrideType != null) overrideType else if (v.type == null) TTAny else typerContext.resolveType(v.type.type);
+			addLocal(v.name.text, type);
+		}
 	}
 
 	public function typeExpr(e:Expr, expectedType:TType):TExpr {
@@ -244,7 +272,10 @@ class ExprTyper {
 		var vars = separatedToArray(vars, function(v, comma) {
 			var type = if (overrideType != null) overrideType else if (v.type == null) TTAny else typerContext.resolveType(v.type.type);
 			var init = if (v.init != null) {equalsToken: v.init.equalsToken, expr: typeExpr(v.init.expr, type)} else null;
-			var tvar = addLocal(v.name.text, type);
+			var tvar = locals[v.name.text];
+			if (tvar == null) {
+				tvar = addLocal(v.name.text, type);
+			}
 			return {
 				syntax: v,
 				v: tvar,

@@ -59,6 +59,7 @@ class Filters {
 			new FunctionApply(context),
 			new ToString(context),
 			new NamespacedToPublic(context),
+			new HoistLocalDecls(context),
 			new VarInits(context),
 			new UintComparison(context),
 			new HandleProtectedOverrides(context),
