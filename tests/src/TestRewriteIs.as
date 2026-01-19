@@ -5,8 +5,8 @@
  * Other types should use `Std.isOfType`.
  */
 package {
-    public class TestIs {
-        public function TestIs() {
+    public class TestRewriteIs {
+        public function TestRewriteIs() {
             var any:Object = {};
             var isFunc:Boolean = (any is Function);
             var isObj:Boolean = (any is Object);

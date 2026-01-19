@@ -4,8 +4,8 @@
  * Unqualified `hasOwnProperty` should be treated as instance access.
  */
 package {
-    public class TestHasOwnProperty {
-        public function TestHasOwnProperty() {
+    public class TestRewriteHasOwnProperty {
+        public function TestRewriteHasOwnProperty() {
             var obj:Object = {};
             var hasKey1:Boolean = obj.hasOwnProperty("a");
             var hasKey2:Boolean = hasOwnProperty("b");

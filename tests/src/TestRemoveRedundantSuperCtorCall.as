@@ -5,21 +5,21 @@
  * The converter should remove redundant super() calls.
  */
 package {
-    public class TestRedundantSuperCtorCall {
-        public function TestRedundantSuperCtorCall() {
+    public class TestRemoveRedundantSuperCtorCall {
+        public function TestRemoveRedundantSuperCtorCall() {
             super(); // useless
         }
     }
 }
 
-class TestRedundantSuperCtorCall2 extends TestRedundantSuperCtorCall {
-    public function TestRedundantSuperCtorCall2() {
+class TestRemoveRedundantSuperCtorCall2 extends TestRemoveRedundantSuperCtorCall {
+    public function TestRemoveRedundantSuperCtorCall2() {
         super(); // NOT useless
     }
 }
 
-class TestRedundantSuperCtorCall3 {
-    public function TestRedundantSuperCtorCall3() {
+class TestRemoveRedundantSuperCtorCall3 {
+    public function TestRemoveRedundantSuperCtorCall3() {
         super(); // useless
     }
 }

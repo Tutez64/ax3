@@ -8,8 +8,8 @@
 package {
     import flash.utils.Dictionary;
 
-    public class TestAs {
-        public function TestAs() {
+    public class TestRewriteAs {
+        public function TestRewriteAs() {
             var obj:Object = {};
             var f:Function = obj as Function;
             var dict:Dictionary = obj as Dictionary;
