@@ -6,6 +6,15 @@ private typedef DeclInfo = {
 }
 
 class HoistLocalDecls extends AbstractFilter {
+	var globalHoist:Map<TVar, Bool> = new Map();
+
+	override function processFunction(fun:TFunction) {
+		var oldHoist = globalHoist;
+		globalHoist = new Map();
+		super.processFunction(fun);
+		globalHoist = oldHoist;
+	}
+
 	override function processExpr(e:TExpr):TExpr {
 		return switch e.kind {
 			case TEBlock(block):
@@ -18,19 +27,23 @@ class HoistLocalDecls extends AbstractFilter {
 	}
 
 	function hoistBlock(block:TBlock):TBlock {
-		var declInfo = new Map<TVar, DeclInfo>();
+		var directDecls = new Map<TVar, DeclInfo>();
+		var allDecls = new Map<TVar, DeclInfo>();
 		var declOrder:Array<TVar> = [];
 
 		for (blockExpr in block.exprs) {
 			switch blockExpr.expr.kind {
 				case TEVars(kind, decls):
 					for (decl in decls) {
-						if (!declInfo.exists(decl.v)) {
-							declInfo[decl.v] = {decl: decl, kind: kind};
+						if (!allDecls.exists(decl.v)) {
+							var info = {decl: decl, kind: kind};
+							directDecls[decl.v] = info;
+							allDecls[decl.v] = info;
 							declOrder.push(decl.v);
 						}
 					}
 				case _:
+					collectNestedDecls(blockExpr.expr, allDecls, declOrder);
 			}
 		}
 
@@ -41,13 +54,21 @@ class HoistLocalDecls extends AbstractFilter {
 		var declared = new Map<TVar, Bool>();
 		var hoist = new Map<TVar, Bool>();
 
+		// 1. Force hoist for variables declared in nested blocks
+		for (v in allDecls.keys()) {
+			if (!directDecls.exists(v)) {
+				hoist[v] = true;
+			}
+		}
+
+		// 2. Scan for variables used before declaration in current block
 		for (blockExpr in block.exprs) {
 			var expr = blockExpr.expr;
 
 			function scan(e:TExpr) {
 				switch e.kind {
 					case TELocal(_, v):
-						if (!declared.exists(v) && declInfo.exists(v)) {
+						if (!declared.exists(v) && allDecls.exists(v)) {
 							hoist[v] = true;
 						}
 					case _:
@@ -71,14 +92,23 @@ class HoistLocalDecls extends AbstractFilter {
 			hasHoisted = true;
 			break;
 		}
+
 		if (!hasHoisted) {
-			return block;
+			var updatedExprs = mapBlockExprs(function(e) {
+				return processExpr(rewriteVars(e, hoist));
+			}, block.exprs);
+			return block.with(exprs = updatedExprs);
+		}
+
+		// Mark these as globally hoisted so nested blocks don't declare them
+		for (v in hoist.keys()) {
+			globalHoist[v] = true;
 		}
 
 		var hoistedDecls:Array<TVarDecl> = [];
 		for (v in declOrder) {
 			if (!hoist.exists(v)) continue;
-			var info = declInfo[v];
+			var info = allDecls[v];
 			var nameToken = info.decl.syntax.name.clone();
 			nameToken.leadTrivia = [];
 			nameToken.trailTrivia = [];
@@ -109,11 +139,23 @@ class HoistLocalDecls extends AbstractFilter {
 			return processExpr(rewriteVars(e, hoist));
 		}, block.exprs);
 
-		if (hoistedExprs.length == 0) {
-			return block;
-		}
-
 		return block.with(exprs = hoistedExprs.concat(newExprs));
+	}
+
+	function collectNestedDecls(e:TExpr, decls:Map<TVar, DeclInfo>, order:Array<TVar>) {
+		switch e.kind {
+			case TEVars(kind, varDecls):
+				for (decl in varDecls) {
+					if (!decls.exists(decl.v)) {
+						decls[decl.v] = {decl: decl, kind: kind};
+						order.push(decl.v);
+					}
+				}
+			case TELocalFunction(_):
+				return;
+			case _:
+				iterExpr(function(ee) collectNestedDecls(ee, decls, order), e);
+		}
 	}
 
 	function rewriteVars(expr:TExpr, hoist:Map<TVar, Bool>):TExpr {
@@ -125,7 +167,7 @@ class HoistLocalDecls extends AbstractFilter {
 				var trail = removeTrailingTrivia(expr);
 
 				for (decl in decls) {
-					if (!hoist.exists(decl.v)) {
+					if (!hoist.exists(decl.v) && !globalHoist.exists(decl.v)) {
 						remaining.push(decl);
 						continue;
 					}

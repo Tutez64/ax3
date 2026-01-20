@@ -28,10 +28,11 @@ class RewriteForIn extends AbstractFilter {
 
 	function makeHaxeFor(loopVar:LoopVarData, data:LoopData, body:TExpr):TExpr {
 		var loopVarVar, loopVarToken;
+		var innerIndent = getInnerIndent(body);
 
 		switch loopVar.kind {
 			case LOwn(kind, decl):
-				if (typeEq(loopVar.v.type, data.loopVarType)) {
+				if (kind.match(VConst(_)) && typeEq(loopVar.v.type, data.loopVarType)) {
 					// types are exactly the same, we can use the haxe loop var directly
 					loopVarVar = loopVar.v;
 					loopVarToken = mkIdent(loopVar.v.name, [], [whitespace]);
@@ -47,6 +48,7 @@ class RewriteForIn extends AbstractFilter {
 							expr: mk(TELocal(mkIdent(tempLoopVarName), loopVarVar), data.loopVarType, loopVar.v.type)
 						})
 					]), TTVoid, TTVoid);
+					processLeadingToken(t -> t.leadTrivia = cloneTrivia(innerIndent), eVarInit);
 
 					body = concatExprs(eVarInit, body);
 				}
@@ -61,6 +63,7 @@ class RewriteForIn extends AbstractFilter {
 					OpAssign(mkTokenWithSpaces(TkEquals, "=")),
 					mk(TELocal(mkIdent(tempLoopVarName), loopVarVar), data.loopVarType, loopVar.v.type)
 				), TTVoid, TTVoid);
+				processLeadingToken(t -> t.leadTrivia = cloneTrivia(innerIndent), eAssign);
 
 				body = concatExprs(eAssign, body);
 		}
@@ -143,6 +146,10 @@ class RewriteForIn extends AbstractFilter {
 			case _:
 				throwError(exprPos(e), "Unsupported `for...in` loop variable declaration");
 		}
+	}
+
+	function cloneTrivia(trivia:Array<Trivia>):Array<Trivia> {
+		return [for (item in trivia) new Trivia(item.kind, item.text)];
 	}
 
 	inline function maybeTempVarIteratee(e:TExpr):{expr:TExpr, tempVar:Null<TVar>} {

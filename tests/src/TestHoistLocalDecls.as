@@ -21,10 +21,20 @@ package {
                 var y;
             };
 
-            var function2:Function = function():void {
+            var function2:Function = function():String {
+                if (1==1)
+                {
+                    var _loc6_:String = "";
+                }
+                return _loc6_;
             };
 
             var function3:Function = function():void {
+                for each(var nb in [0, 1, 2])
+                {
+                    function1();
+                }
+                nb = 0;
             };
         }
     }

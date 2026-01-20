@@ -73,7 +73,6 @@ class ExprTyper {
 	}
 
 	public function typeBlock(b:BracedExprBlock):TBlock {
-		pushLocals();
 		predeclareBlockLocals(b);
 		var exprs = [];
 		for (e in b.exprs) {
@@ -82,7 +81,6 @@ class ExprTyper {
 				semicolon: e.semicolon
 			});
 		}
-		popLocals();
 		return {
 			syntax: {openBrace: b.openBrace, closeBrace: b.closeBrace},
 			exprs: exprs
@@ -91,15 +89,94 @@ class ExprTyper {
 
 	function predeclareBlockLocals(b:BracedExprBlock) {
 		for (e in b.exprs) {
-			switch e.expr {
-				case EVars(kind, vars):
-					predeclareVars(kind, vars);
-				case EFunction(_, name, _) if (name != null):
-					if (locals[name.text] == null) {
-						addLocal(name.text, TTFunction);
+			predeclareRecursive(e.expr);
+		}
+	}
+
+	function predeclareRecursive(e:Expr) {
+		switch (e) {
+			case EVars(kind, vars):
+				predeclareVars(kind, vars);
+			case EFunction(_, name, _) if (name != null):
+				if (locals[name.text] == null) {
+					addLocal(name.text, TTFunction);
+				}
+			case EBlock(b):
+				for (be in b.exprs) predeclareRecursive(be.expr);
+			case EIf(_, _, econd, _, ethen, eelse):
+				predeclareRecursive(econd);
+				predeclareRecursive(ethen);
+				if (eelse != null) predeclareRecursive(eelse.expr);
+			case ETernary(econd, _, ethen, _, eelse):
+				predeclareRecursive(econd);
+				predeclareRecursive(ethen);
+				predeclareRecursive(eelse);
+			case EWhile(w):
+				predeclareRecursive(w.cond);
+				predeclareRecursive(w.body);
+			case EDoWhile(w):
+				predeclareRecursive(w.body);
+				predeclareRecursive(w.cond);
+			case EFor(f):
+				if (f.einit != null) predeclareRecursive(f.einit);
+				if (f.econd != null) predeclareRecursive(f.econd);
+				if (f.eincr != null) predeclareRecursive(f.eincr);
+				predeclareRecursive(f.body);
+			case EForIn(f) | EForEach(f):
+				predeclareRecursive(f.iter.eit);
+				predeclareRecursive(f.iter.eobj);
+				predeclareRecursive(f.body);
+			case ETry(_, block, catches, finally_):
+				for (be in block.exprs) predeclareRecursive(be.expr);
+				for (c in catches) {
+					for (be in c.block.exprs) predeclareRecursive(be.expr);
+				}
+				if (finally_ != null) for (be in finally_.block.exprs) predeclareRecursive(be.expr);
+			case ESwitch(_, _, subj, _, _, cases, _):
+				predeclareRecursive(subj);
+				for (c in cases) {
+					switch (c) {
+						case CCase(_, v, _, body):
+							predeclareRecursive(v);
+							for (be in body) predeclareRecursive(be.expr);
+						case CDefault(_, _, body):
+							for (be in body) predeclareRecursive(be.expr);
 					}
-				case _:
-			}
+				}
+			case EParens(_, e, _):
+				predeclareRecursive(e);
+			case EArrayAccess(e, _, eindex, _):
+				predeclareRecursive(e);
+				predeclareRecursive(eindex);
+			case EArrayDecl(d):
+				if (d.elems != null) {
+					for (el in separatedToArray(d.elems, function(e, comma) return e)) predeclareRecursive(el);
+				}
+			case ECall(e, args):
+				predeclareRecursive(e);
+				if (args.args != null) {
+					for (el in separatedToArray(args.args, function(e, comma) return e)) predeclareRecursive(el);
+				}
+			case ENew(_, e, args):
+				predeclareRecursive(e);
+				if (args != null && args.args != null) {
+					for (el in separatedToArray(args.args, function(e, comma) return e)) predeclareRecursive(el);
+				}
+			case EField(e, _, _) | EXmlAttr(e, _, _, _) | EXmlDescend(e, _, _) | EPreUnop(_, e) | EPostUnop(e, _) | EAs(e, _, _) | ETypeof(_, e) | EThrow(_, e) | EDelete(_, e) | EReturn(_, e):
+				if (e != null) predeclareRecursive(e);
+			case EXmlAttrExpr(e, _, _, _, eattr, _):
+				predeclareRecursive(e);
+				predeclareRecursive(eattr);
+			case EObjectDecl(_, fields, _):
+				for (f in separatedToArray(fields, function(f, comma) return f)) predeclareRecursive(f.value);
+			case EBinop(a, _, b):
+				predeclareRecursive(a);
+				predeclareRecursive(b);
+			case EVectorDecl(_, _, d):
+				if (d.elems != null) {
+					for (el in separatedToArray(d.elems, function(e, comma) return e)) predeclareRecursive(el);
+				}
+			case _:
 		}
 	}
 
@@ -1166,11 +1243,9 @@ class ExprTyper {
 
 		migrateForInVarHaxeTypeAnnotation(f.forKeyword, f.iter);
 
-		pushLocals();
 		var eobj = typeExpr(f.iter.eobj, TTAny);
 		var eit = typeExpr(f.iter.eit, TTAny);
 		var ebody = typeExpr(f.body, TTVoid);
-		popLocals();
 		return mk(TEForIn({
 			syntax: {
 				forKeyword: f.forKeyword,
@@ -1191,11 +1266,9 @@ class ExprTyper {
 
 		migrateForInVarHaxeTypeAnnotation(f.forKeyword, f.iter);
 
-		pushLocals();
 		var eobj = typeExpr(f.iter.eobj, TTAny);
 		var eit = typeExpr(f.iter.eit, TTAny);
 		var ebody = typeExpr(f.body, TTVoid);
-		popLocals();
 		return mk(TEForEach({
 			syntax: {
 				forKeyword: f.forKeyword,
@@ -1215,12 +1288,10 @@ class ExprTyper {
 	function typeFor(f:For, expectedType:TType):TExpr {
 		if (expectedType != TTVoid) throw "assert";
 
-		pushLocals();
 		var einit = if (f.einit != null) typeExpr(f.einit, TTVoid) else null;
 		var econd = if (f.econd != null) typeExpr(f.econd, TTBoolean) else null;
 		var eincr = if (f.eincr != null) typeExpr(f.eincr, TTVoid) else null;
 		var ebody = typeExpr(f.body, TTVoid);
-		popLocals();
 		return mk(TEFor({
 			syntax: {
 				keyword: f.keyword,
