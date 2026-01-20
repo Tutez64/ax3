@@ -7,8 +7,8 @@ package {
     import flash.utils.Dictionary;
     import flash.utils.ByteArray;
 
-    public class TestRewriteArrayAccess {
-        public function TestRewriteArrayAccess() {
+    public class TestFilterRewriteArrayAccess {
+        public function TestFilterRewriteArrayAccess() {
             var obj:Object = { "a": 1, "b": 2 };
             var dict:Dictionary = new Dictionary();
             dict["key"] = "value";

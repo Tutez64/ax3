@@ -5,8 +5,8 @@
  * Redundant Vector casts should report a non-blocking error.
  */
 package {
-    public class TestRewriteVectorDecl {
-        public function TestRewriteVectorDecl() {
+    public class TestFilterRewriteVectorDecl {
+        public function TestFilterRewriteVectorDecl() {
             var numbers:Vector.<int> = new <int>[1, 2, 3];
             var empty:Vector.<String> = new <String>[];
             var copy:Vector.<int> = Vector.<int>(numbers);

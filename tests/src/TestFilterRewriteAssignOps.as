@@ -4,8 +4,8 @@
  * `||=` and `&&=` should be rewritten to boolean logic assignments.
  */
 package {
-    public class TestRewriteAssignOps {
-        public function TestRewriteAssignOps() {
+    public class TestFilterRewriteAssignOps {
+        public function TestFilterRewriteAssignOps() {
             var count:int = 10;
             var denom:Number = 2.5;
             count /= denom;

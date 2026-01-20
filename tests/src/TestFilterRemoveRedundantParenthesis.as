@@ -4,8 +4,8 @@
  * `return` and `throw` should keep proper spacing after removal.
  */
 package {
-    public class TestRemoveRedundantParenthesis {
-        public function TestRemoveRedundantParenthesis() {
+    public class TestFilterRemoveRedundantParenthesis {
+        public function TestFilterRemoveRedundantParenthesis() {
             var value:int = (1);
             var copy:int = (value);
             var sum:int = (value + 1);

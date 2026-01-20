@@ -8,8 +8,8 @@
 package {
     import flash.utils.Dictionary;
 
-    public class TestRewriteDelete {
-        public function TestRewriteDelete() {
+    public class TestFilterRewriteDelete {
+        public function TestFilterRewriteDelete() {
             var obj:Object = {};
             var key:int = 1;
             delete obj["a"];

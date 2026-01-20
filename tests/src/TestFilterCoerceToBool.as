@@ -4,8 +4,8 @@
  * They should be explicitly coerced to boolean in Haxe.
  */
 package {
-    public class TestCoerceToBool {
-        public function TestCoerceToBool() {
+    public class TestFilterCoerceToBool {
+        public function TestFilterCoerceToBool() {
             var obj:Object = {};
             var str:String = "hello";
             var num:Number = 123;

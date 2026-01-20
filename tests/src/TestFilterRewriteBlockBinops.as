@@ -3,8 +3,8 @@
  * `condition && doSomething()` should become `if (condition) doSomething()`.
  */
 package {
-    public class TestRewriteBlockBinops {
-        public function TestRewriteBlockBinops() {
+    public class TestFilterRewriteBlockBinops {
+        public function TestFilterRewriteBlockBinops() {
             var ready:Boolean = true;
             ready && initialize();
         }

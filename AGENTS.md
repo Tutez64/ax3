@@ -34,8 +34,8 @@ The conversion pipeline is sequential and defined in `src/ax3/Main.hx`:
 *   **Playground/Repro Tests**: `tests/` directory.
     *   Use this folder to create isolated reproduction cases for converter bugs or features.
     *   Structure: `tests/src/` (AS3 input), `tests/out/` (Haxe output), `tests/config.json`.
-    *   **Requirement**: Each test file in `tests/src/` **must** include comments explaining the test case and expected behavior (see `tests/src/TestRedundantSuperCtorCall.as` for example).
-    *   **Naming**: `tests/src` files must match filter names (e.g. `src/ax3/filters/RewriteAs.hx` -> `tests/src/TestRewriteAs.as`).
+    *   **Requirement**: Each test file in `tests/src/` **must** include comments explaining the test case and expected behavior (see `tests/src/TestFilterRedundantSuperCtorCall.as` for example).
+    *   **Naming**: `tests/src` files for filters must be named `TestFilter{FilterName}.as` (e.g. `src/ax3/filters/RewriteAs.hx` -> `tests/src/TestFilterRewriteAs.as`). Other tests should follow `Test{Feature}.as`.
     *   **Error coverage**: Tests should intentionally trigger every non-blocking `reportError` produced by filters; only `throwError` cases are allowed to remain untested until explicitly targeted.
     *   **`reportError` that throws**: If triggering a `reportError` effectively causes a `throw` (as observed in practice), treat it as a `throwError` case — do not trigger it in tests unless explicitly requested.
     *   **Compat changes**: You may update `compat/` when needed, but you must update `compat-test/` accordingly and verify with `npx haxe test-compat.hxml`.

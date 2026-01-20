@@ -3,8 +3,8 @@
  * Verifies how AS3 casts are converted to Haxe.
  */
 package {
-    public class TestRewriteCasts {
-        public function TestRewriteCasts() {
+    public class TestFilterRewriteCasts {
+        public function TestFilterRewriteCasts() {
             var a:Object = "test";
             
             // Basic casts

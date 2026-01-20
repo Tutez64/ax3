@@ -4,8 +4,8 @@
  * This filter should add Std.int() where necessary.
  */
 package {
-    public class TestNumberToInt {
-        public function TestNumberToInt() {
+    public class TestFilterNumberToInt {
+        public function TestFilterNumberToInt() {
             var n:Number = 10.5;
             var i:int = n;
             

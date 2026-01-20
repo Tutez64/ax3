@@ -4,8 +4,8 @@
  * `new Array(a, b, c)` should become an array literal.
  */
 package {
-    public class TestRewriteNewArray {
-        public function TestRewriteNewArray() {
+    public class TestFilterRewriteNewArray {
+        public function TestFilterRewriteNewArray() {
             var sized:Array = new Array(3);
             var values:Array = new Array(1, 2, 3);
         }

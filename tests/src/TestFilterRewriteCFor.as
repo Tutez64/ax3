@@ -4,8 +4,8 @@
  * Boundaries like `<=` should be normalized to the exclusive upper bound.
  */
 package {
-    public class TestRewriteCFor {
-        public function TestRewriteCFor() {
+    public class TestFilterRewriteCFor {
+        public function TestFilterRewriteCFor() {
             var sum:int = 0;
             var limit:int = 3;
 

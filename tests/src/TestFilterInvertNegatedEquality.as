@@ -4,8 +4,8 @@
  * `!(a != b)` should become `a == b`.
  */
 package {
-    public class TestInvertNegatedEquality {
-        public function TestInvertNegatedEquality() {
+    public class TestFilterInvertNegatedEquality {
+        public function TestFilterInvertNegatedEquality() {
             var a:int = 1;
             var b:int = 2;
             var c:Boolean = !(a == b);

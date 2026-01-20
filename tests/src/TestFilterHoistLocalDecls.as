@@ -4,8 +4,8 @@
  * The variable should be hoisted to the top of the block.
  */
 package {
-    public class TestHoistLocalDecls {
-        public function TestHoistLocalDecls() {
+    public class TestFilterHoistLocalDecls {
+        public function TestFilterHoistLocalDecls() {
             var doThings:Function = function():void {
                 function1();
                 function3();
