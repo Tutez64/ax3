@@ -58,7 +58,7 @@ class SWCLoader {
 				| ["", "int"]
 				| ["", "uint"]
 				| ["", "String"]
-				| ["", "Array"]
+				// | ["", "Array"]
 				| ["", "RegExp"]
 				| ["", "XML"]
 				| ["", "XMLList"]

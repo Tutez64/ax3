@@ -2,6 +2,7 @@ package ax3;
 
 import ax3.ParseTree;
 import ax3.Token;
+import ax3.TypedTreeTools.tUntypedArray;
 import ax3.TypedTreeTools.tUntypedDictionary;
 import ax3.TypedTreeTools.isFieldStatic;
 
@@ -83,6 +84,7 @@ class TypedTree {
 
 	public static function declToInst(decl:TDecl):TType {
 		return switch decl.kind {
+			case TDClassOrInterface({name: "Array"}): tUntypedArray;
 			case TDClassOrInterface({name: "Dictionary"}): tUntypedDictionary; // TODO: check package
 			case TDClassOrInterface(c): TTInst(c);
 			case _: throw "assert";
