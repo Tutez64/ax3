@@ -995,6 +995,39 @@ class ExprTyper {
 					type: type,
 					syntax: TPath({first: syntax, rest: []})
 				});
+			case TEBuiltin(syntax, "String") | TEBuiltin(syntax, "Number") | TEBuiltin(syntax, "int") | TEBuiltin(syntax, "uint") | TEBuiltin(syntax, "Boolean"):
+				var type = switch syntax.text {
+					case "String": TTString;
+					case "Number": TTNumber;
+					case "int": TTInt;
+					case "uint": TTUint;
+					case "Boolean": TTBoolean;
+					case _: throw "assert";
+				}
+
+				var ctorType = TTFun([TTAny], type);
+				var argsTyped = if (args != null) typeCallArgs(args, ctorType) else {openParen: null, closeParen: null, args: []};
+
+				if (argsTyped.args.length == 0) {
+					var lit = switch type {
+						case TTString: TLString(new Token(keyword.pos, TkStringDouble, '""', keyword.leadTrivia, []));
+						case TTNumber: TLNumber(new Token(keyword.pos, TkDecimalInteger, '0', keyword.leadTrivia, []));
+						case TTInt | TTUint: TLInt(new Token(keyword.pos, TkDecimalInteger, '0', keyword.leadTrivia, []));
+						case TTBoolean: TLBool(new Token(keyword.pos, TkIdent, 'false', keyword.leadTrivia, []));
+						case _: throw "assert";
+					}
+					return mk(TELiteral(lit), type, expectedType);
+				} else {
+					return mk(TECast({
+						syntax: {
+							openParen: argsTyped.openParen,
+							closeParen: argsTyped.closeParen,
+							path: {first: syntax, rest: []}
+						},
+						type: type,
+						expr: argsTyped.args[0].expr
+					}), type, expectedType);
+				}
 			case TEBuiltin(_, _):
 				return throwErr("Unprocessed `new builtin`", keyword.pos);
 			case _:
