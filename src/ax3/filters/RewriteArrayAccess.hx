@@ -49,6 +49,7 @@ class RewriteArrayAccess extends AbstractFilter {
 						}));
 
 					case [TTDictionary(expectedKeyType, _), keyType]:
+						if (keyType == TTNumber) reportError(exprPos(e), "Dictionary access using Number index");
 						switch [expectedKeyType, keyType] {
 							case [TTAny, _] | [_, TTAny]: // oh well
 							case [TTObject(TTAny), _]:

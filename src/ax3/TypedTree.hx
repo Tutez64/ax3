@@ -45,6 +45,8 @@ class TypedTree {
 			case 'XML': TTXML;
 			case 'XMLList': TTXMLList;
 			case 'RegExp': TTRegExp;
+			case '*' | 'Any': TTAny;
+			case 'Object': TTObject(TTAny);
 			case _: TTInst(getByFullName(s));
 		} : switch s.substr(0, i) {
 			case 'Array': TTArray(getType(s.substring(i + 1, s.lastIndexOf('>'))));

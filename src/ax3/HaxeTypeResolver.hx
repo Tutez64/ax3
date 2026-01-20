@@ -45,7 +45,7 @@ class HaxeTypeResolver {
 			case HTPath("haxe.DynamicAccess", [elemT]): TTObject(resolveHaxeType(elemT, pos));
 			case HTPath("Object" | "flash.utils.Object", []): tUntypedObject;
 			case HTPath("Vector" | "flash.Vector" | "openfl.Vector", [t]): TTVector(resolveHaxeType(t, pos));
-			case HTPath("GenericDictionary", [k, v]): TTDictionary(resolveHaxeType(k, pos), resolveHaxeType(v, pos));
+			case HTPath("GenericDictionary" | "Dictionary" | "flash.utils.Dictionary", [k, v]): TTDictionary(resolveHaxeType(k, pos), resolveHaxeType(v, pos));
 			case HTPath("Class", [HTPath("Dynamic", [])]): TTClass;
 			case HTPath("Class", [HTPath(path, [])]): TypedTree.declToStatic(resolveDotPath(path));
 			case HTPath("Null", [t]): resolveHaxeType(t, pos); // TODO: keep nullability?
