@@ -248,7 +248,7 @@ class SWCLoader {
 					}
 				}
 
-				var dynList = [{p: 'flash.net', c: 'URLVariables'}, {p: 'flash.display', c: 'ShaderData'}];
+				var dynList = [{p: 'flash.net', c: 'URLVariables'}, {p: 'flash.display', c: 'ShaderData'}, {p: 'flash.display', c: 'MovieClip'}];
 
 				var tDecl:TClassOrInterfaceDecl = {
 					kind: clsKind,
