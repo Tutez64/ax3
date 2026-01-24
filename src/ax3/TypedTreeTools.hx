@@ -533,37 +533,410 @@ class TypedTreeTools {
 					case PostIncr(t): PostIncr(t.clone());
 					case PostDecr(t): PostDecr(t.clone());
 				});
-			case TEDeclRef(path, c): throw "TODO";
-			case TELocalFunction(f): throw "TODO";
-			case TECall(eobj, args): throw "TODO";
-			case TECast(c): throw "TODO";
-			case TEArrayDecl(a): throw "TODO";
-			case TEVectorDecl(v): throw "TODO";
-			case TEVars(kind, vars): throw "TODO";
-			case TEObjectDecl(o): throw "TODO";
-			case TEArrayAccess(a): throw "TODO";
-			case TEBlock(block): throw "TODO";
-			case TETry(t): throw "TODO";
-			case TEVector(syntax, type): throw "TODO";
-			case TETernary(t): throw "TODO";
-			case TEIf(i): throw "TODO";
-			case TEWhile(w): throw "TODO";
-			case TEDoWhile(w): throw "TODO";
-			case TEFor(f): throw "TODO";
-			case TEForIn(f): throw "TODO";
-			case TEForEach(f): throw "TODO";
-			case TEHaxeFor(f): throw "TODO";
-			case TEAs(e, keyword, type): throw "TODO";
-			case TESwitch(s): throw "TODO";
-			case TENew(keyword, cls, args): throw "TODO";
-			case TECondCompValue(v): throw "TODO";
-			case TECondCompBlock(v, expr): throw "TODO";
-			case TEXmlChild(x): throw "TODO";
-			case TEXmlAttr(x): throw "TODO";
-			case TEXmlAttrExpr(x): throw "TODO";
-			case TEXmlDescend(x): throw "TODO";
-			case TEUseNamespace(ns): throw "TODO";
+			case TEDeclRef(path, c):
+				TEDeclRef(cloneDotPath(path), c);
+			case TELocalFunction(f):
+				TELocalFunction({
+					syntax: {keyword: f.syntax.keyword.clone()},
+					name: if (f.name == null) null else {syntax: f.name.syntax.clone(), name: f.name.name},
+					fun: cloneFunction(f.fun)
+				});
+			case TECall(eobj, args):
+				TECall(cloneExpr(eobj), cloneCallArgs(args));
+			case TECast(c):
+				TECast({
+					syntax: {
+						openParen: c.syntax.openParen.clone(),
+						closeParen: c.syntax.closeParen.clone(),
+						path: cloneDotPath(c.syntax.path)
+					},
+					expr: cloneExpr(c.expr),
+					type: c.type
+				});
+			case TEArrayDecl(a):
+				TEArrayDecl(cloneArrayDecl(a));
+			case TEVectorDecl(v):
+				TEVectorDecl({
+					syntax: {
+						newKeyword: v.syntax.newKeyword.clone(),
+						typeParam: cloneTypeParam(v.syntax.typeParam)
+					},
+					elements: cloneArrayDecl(v.elements),
+					type: v.type
+				});
+			case TEVars(kind, vars):
+				TEVars(cloneVarDeclKind(kind), [for (v in vars) cloneVarDecl(v)]);
+			case TEObjectDecl(o):
+				TEObjectDecl(cloneObjectDecl(o));
+			case TEArrayAccess(a):
+				TEArrayAccess({
+					syntax: {openBracket: a.syntax.openBracket.clone(), closeBracket: a.syntax.closeBracket.clone()},
+					eobj: cloneExpr(a.eobj),
+					eindex: cloneExpr(a.eindex)
+				});
+			case TEBlock(block):
+				TEBlock(cloneBlock(block));
+			case TETry(t):
+				TETry(cloneTry(t));
+			case TEVector(syntax, type):
+				TEVector(cloneVectorSyntax(syntax), type);
+			case TETernary(t):
+				TETernary({
+					syntax: {question: t.syntax.question.clone(), colon: t.syntax.colon.clone()},
+					econd: cloneExpr(t.econd),
+					ethen: cloneExpr(t.ethen),
+					eelse: cloneExpr(t.eelse)
+				});
+			case TEIf(i):
+				TEIf({
+					syntax: {keyword: i.syntax.keyword.clone(), openParen: i.syntax.openParen.clone(), closeParen: i.syntax.closeParen.clone()},
+					econd: cloneExpr(i.econd),
+					ethen: cloneExpr(i.ethen),
+					eelse: if (i.eelse == null) null else {keyword: i.eelse.keyword.clone(), expr: cloneExpr(i.eelse.expr), semiliconBefore: i.eelse.semiliconBefore}
+				});
+			case TEWhile(w):
+				TEWhile({
+					syntax: {keyword: w.syntax.keyword.clone(), openParen: w.syntax.openParen.clone(), closeParen: w.syntax.closeParen.clone()},
+					cond: cloneExpr(w.cond),
+					body: cloneExpr(w.body)
+				});
+			case TEDoWhile(w):
+				TEDoWhile({
+					syntax: {
+						doKeyword: w.syntax.doKeyword.clone(),
+						whileKeyword: w.syntax.whileKeyword.clone(),
+						openParen: w.syntax.openParen.clone(),
+						closeParen: w.syntax.closeParen.clone()
+					},
+					body: cloneExpr(w.body),
+					cond: cloneExpr(w.cond)
+				});
+			case TEFor(f):
+				TEFor({
+					syntax: {
+						keyword: f.syntax.keyword.clone(),
+						openParen: f.syntax.openParen.clone(),
+						initSep: f.syntax.initSep.clone(),
+						condSep: f.syntax.condSep.clone(),
+						closeParen: f.syntax.closeParen.clone()
+					},
+					einit: if (f.einit == null) null else cloneExpr(f.einit),
+					econd: if (f.econd == null) null else cloneExpr(f.econd),
+					eincr: if (f.eincr == null) null else cloneExpr(f.eincr),
+					body: cloneExpr(f.body)
+				});
+			case TEForIn(f):
+				TEForIn({
+					syntax: {forKeyword: f.syntax.forKeyword.clone(), openParen: f.syntax.openParen.clone(), closeParen: f.syntax.closeParen.clone()},
+					iter: cloneForInIter(f.iter),
+					body: cloneExpr(f.body)
+				});
+			case TEForEach(f):
+				TEForEach({
+					syntax: {
+						forKeyword: f.syntax.forKeyword.clone(),
+						eachKeyword: f.syntax.eachKeyword.clone(),
+						openParen: f.syntax.openParen.clone(),
+						closeParen: f.syntax.closeParen.clone()
+					},
+					iter: cloneForInIter(f.iter),
+					body: cloneExpr(f.body)
+				});
+			case TEHaxeFor(f):
+				TEHaxeFor({
+					syntax: {
+						forKeyword: f.syntax.forKeyword.clone(),
+						openParen: f.syntax.openParen.clone(),
+						itName: f.syntax.itName.clone(),
+						inKeyword: f.syntax.inKeyword.clone(),
+						closeParen: f.syntax.closeParen.clone()
+					},
+					vit: f.vit,
+					iter: cloneExpr(f.iter),
+					body: cloneExpr(f.body)
+				});
+			case TEAs(e, keyword, type):
+				TEAs(cloneExpr(e), keyword.clone(), cloneTypeRef(type));
+			case TESwitch(s):
+				TESwitch(cloneSwitch(s));
+			case TENew(keyword, cls, args):
+				TENew(keyword.clone(), cloneNewObject(cls), if (args == null) null else cloneCallArgs(args));
+			case TECondCompValue(v):
+				TECondCompValue(cloneCondCompVar(v));
+			case TECondCompBlock(v, expr):
+				TECondCompBlock(cloneCondCompVar(v), cloneExpr(expr));
+			case TEXmlChild(x):
+				TEXmlChild({
+					syntax: {dot: x.syntax.dot.clone(), name: x.syntax.name.clone()},
+					eobj: cloneExpr(x.eobj),
+					name: x.name
+				});
+			case TEXmlAttr(x):
+				TEXmlAttr({
+					syntax: {dot: x.syntax.dot.clone(), at: x.syntax.at.clone(), name: x.syntax.name.clone()},
+					eobj: cloneExpr(x.eobj),
+					name: x.name
+				});
+			case TEXmlAttrExpr(x):
+				TEXmlAttrExpr({
+					syntax: {
+						dot: x.syntax.dot.clone(),
+						at: x.syntax.at.clone(),
+						openBracket: x.syntax.openBracket.clone(),
+						closeBracket: x.syntax.closeBracket.clone()
+					},
+					eobj: cloneExpr(x.eobj),
+					eattr: cloneExpr(x.eattr)
+				});
+			case TEXmlDescend(x):
+				TEXmlDescend({
+					syntax: {dotDot: x.syntax.dotDot.clone(), name: x.syntax.name.clone()},
+					eobj: cloneExpr(x.eobj),
+					name: x.name
+				});
+			case TEUseNamespace(ns):
+				TEUseNamespace({
+					useKeyword: ns.useKeyword.clone(),
+					namespaceKeyword: ns.namespaceKeyword.clone(),
+					name: ns.name.clone()
+				});
 		});
+	}
+
+	static function cloneDotPath(path:DotPath):DotPath {
+		return {
+			first: path.first.clone(),
+			rest: [for (part in path.rest) {sep: part.sep.clone(), element: part.element.clone()}]
+		};
+	}
+
+	static function cloneSyntaxType(type:SyntaxType):SyntaxType {
+		return switch type {
+			case TAny(star):
+				TAny(star.clone());
+			case TPath(path):
+				TPath(cloneDotPath(path));
+			case TVector(v):
+				TVector({
+					name: v.name.clone(),
+					dot: v.dot.clone(),
+					t: {
+						lt: v.t.lt.clone(),
+						type: cloneSyntaxType(v.t.type),
+						gt: v.t.gt.clone()
+					}
+				});
+		}
+	}
+
+	static function cloneTypeParam(param:TypeParam):TypeParam {
+		return {
+			lt: param.lt.clone(),
+			type: cloneSyntaxType(param.type),
+			gt: param.gt.clone()
+		};
+	}
+
+	static function cloneTypeHint(type:Null<TypeHint>):Null<TypeHint> {
+		if (type == null) return null;
+		return {colon: type.colon.clone(), type: cloneSyntaxType(type.type)};
+	}
+
+	static function cloneTypeHintRequired(type:TypeHint):TypeHint {
+		return {colon: type.colon.clone(), type: cloneSyntaxType(type.type)};
+	}
+
+	static function cloneTypeRef(typeRef:TTypeRef):TTypeRef {
+		return {type: typeRef.type, syntax: cloneSyntaxType(typeRef.syntax)};
+	}
+
+	static function cloneVarDeclKind(kind:VarDeclKind):VarDeclKind {
+		return switch kind {
+			case VVar(t): VVar(t.clone());
+			case VConst(t): VConst(t.clone());
+		}
+	}
+
+	static function cloneVarInit(init:Null<TVarInit>):Null<TVarInit> {
+		if (init == null) return null;
+		return {equalsToken: init.equalsToken.clone(), expr: cloneExpr(init.expr)};
+	}
+
+	static function cloneVarDecl(decl:TVarDecl):TVarDecl {
+		return {
+			syntax: {
+				name: decl.syntax.name.clone(),
+				type: cloneTypeHint(decl.syntax.type)
+			},
+			v: decl.v,
+			init: cloneVarInit(decl.init),
+			comma: if (decl.comma == null) null else decl.comma.clone()
+		};
+	}
+
+	static function cloneObjectField(field:TObjectField):TObjectField {
+		return {
+			syntax: {
+				name: field.syntax.name.clone(),
+				nameKind: field.syntax.nameKind,
+				colon: field.syntax.colon.clone(),
+				comma: if (field.syntax.comma == null) null else field.syntax.comma.clone()
+			},
+			name: field.name,
+			expr: cloneExpr(field.expr)
+		};
+	}
+
+	static function cloneObjectDecl(obj:TObjectDecl):TObjectDecl {
+		return {
+			syntax: {openBrace: obj.syntax.openBrace.clone(), closeBrace: obj.syntax.closeBrace.clone()},
+			fields: [for (f in obj.fields) cloneObjectField(f)]
+		};
+	}
+
+	static function cloneArrayDecl(arr:TArrayDecl):TArrayDecl {
+		return {
+			syntax: {openBracket: arr.syntax.openBracket.clone(), closeBracket: arr.syntax.closeBracket.clone()},
+			elements: [for (e in arr.elements) {expr: cloneExpr(e.expr), comma: if (e.comma == null) null else e.comma.clone()}]
+		};
+	}
+
+	static function cloneCallArgs(args:TCallArgs):TCallArgs {
+		return {
+			openParen: args.openParen.clone(),
+			args: [for (a in args.args) {expr: cloneExpr(a.expr), comma: if (a.comma == null) null else a.comma.clone()}],
+			closeParen: args.closeParen.clone()
+		};
+	}
+
+	static function cloneBlockExprs(exprs:Array<TBlockExpr>):Array<TBlockExpr> {
+		return [for (e in exprs) {expr: cloneExpr(e.expr), semicolon: if (e.semicolon == null) null else e.semicolon.clone()}];
+	}
+
+	static function cloneBlock(block:TBlock):TBlock {
+		return {
+			syntax: {openBrace: block.syntax.openBrace.clone(), closeBrace: block.syntax.closeBrace.clone()},
+			exprs: cloneBlockExprs(block.exprs)
+		};
+	}
+
+	static function cloneCatch(c:TCatch):TCatch {
+		return {
+			syntax: {
+				keyword: c.syntax.keyword.clone(),
+				openParen: c.syntax.openParen.clone(),
+				name: c.syntax.name.clone(),
+				type: cloneTypeHintRequired(c.syntax.type),
+				closeParen: c.syntax.closeParen.clone()
+			},
+			v: c.v,
+			expr: cloneExpr(c.expr)
+		};
+	}
+
+	static function cloneTry(t:TTry):TTry {
+		return {
+			keyword: t.keyword.clone(),
+			expr: cloneExpr(t.expr),
+			catches: [for (c in t.catches) cloneCatch(c)]
+		};
+	}
+
+	static function cloneFunctionArgKind(kind:TFunctionArgKind):TFunctionArgKind {
+		return switch kind {
+			case TArgNormal(typeHint, init):
+				TArgNormal(cloneTypeHint(typeHint), cloneVarInit(init));
+			case TArgRest(dots, restKind, typeHint):
+				TArgRest(dots.clone(), restKind, cloneTypeHint(typeHint));
+		}
+	}
+
+	static function cloneFunctionArg(arg:TFunctionArg):TFunctionArg {
+		return {
+			syntax: {name: arg.syntax.name.clone()},
+			name: arg.name,
+			type: arg.type,
+			v: arg.v,
+			kind: cloneFunctionArgKind(arg.kind),
+			comma: if (arg.comma == null) null else arg.comma.clone()
+		};
+	}
+
+	static function cloneFunctionSignature(sig:TFunctionSignature):TFunctionSignature {
+		return {
+			syntax: {openParen: sig.syntax.openParen.clone(), closeParen: sig.syntax.closeParen.clone()},
+			args: [for (arg in sig.args) cloneFunctionArg(arg)],
+			ret: {syntax: cloneTypeHint(sig.ret.syntax), type: sig.ret.type}
+		};
+	}
+
+	static function cloneFunction(fun:TFunction):TFunction {
+		return {sig: cloneFunctionSignature(fun.sig), expr: cloneExpr(fun.expr)};
+	}
+
+	static function cloneVectorSyntax(syntax:VectorSyntax):VectorSyntax {
+		return {
+			name: syntax.name.clone(),
+			dot: syntax.dot.clone(),
+			t: {
+				lt: syntax.t.lt.clone(),
+				type: cloneSyntaxType(syntax.t.type),
+				gt: syntax.t.gt.clone()
+			}
+		};
+	}
+
+	static function cloneForInIter(iter:TForInIter):TForInIter {
+		return {
+			eit: cloneExpr(iter.eit),
+			inKeyword: iter.inKeyword.clone(),
+			eobj: cloneExpr(iter.eobj)
+		};
+	}
+
+	static function cloneSwitchCase(c:TSwitchCase):TSwitchCase {
+		return {
+			syntax: {keyword: c.syntax.keyword.clone(), colon: c.syntax.colon.clone()},
+			values: [for (v in c.values) cloneExpr(v)],
+			body: cloneBlockExprs(c.body)
+		};
+	}
+
+	static function cloneSwitchDefault(d:TSwitchDefault):TSwitchDefault {
+		return {
+			syntax: {keyword: d.syntax.keyword.clone(), colon: d.syntax.colon.clone()},
+			body: cloneBlockExprs(d.body)
+		};
+	}
+
+	static function cloneSwitch(s:TSwitch):TSwitch {
+		return {
+			syntax: {
+				keyword: s.syntax.keyword.clone(),
+				openParen: s.syntax.openParen.clone(),
+				closeParen: s.syntax.closeParen.clone(),
+				openBrace: s.syntax.openBrace.clone(),
+				closeBrace: s.syntax.closeBrace.clone()
+			},
+			subj: cloneExpr(s.subj),
+			cases: [for (c in s.cases) cloneSwitchCase(c)],
+			def: if (s.def == null) null else cloneSwitchDefault(s.def)
+		};
+	}
+
+	static function cloneNewObject(obj:TNewObject):TNewObject {
+		return switch obj {
+			case TNType(t): TNType(cloneTypeRef(t));
+			case TNExpr(e): TNExpr(cloneExpr(e));
+		}
+	}
+
+	static function cloneCondCompVar(v:TCondCompVar):TCondCompVar {
+		return {
+			syntax: {ns: v.syntax.ns.clone(), sep: v.syntax.sep.clone(), name: v.syntax.name.clone()},
+			ns: v.ns,
+			name: v.name
+		};
 	}
 
 	static function cloneBinop(op:Binop):Binop {

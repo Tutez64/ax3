@@ -8,8 +8,13 @@ class Filters {
 		var externImports = new ExternModuleLevelImports(context);
 		var coerceToBool = new CoerceToBool(context);
 		var detectFieldRedefinitions = new RewriteRedefinedPrivate.DetectFieldRedefinitions(context);
+		// cloneExpr needs coverage both before and after rewrites to hit pre- and post-transform node kinds.
+		var cloneExprSmokeEarly = context.config.testCloneExpr == true ? new CloneExprSmoke(context) : null;
+		var cloneExprSmokeLate = context.config.testCloneExpr == true ? new CloneExprSmoke(context) : null;
 
-		for (f in [
+		var filters:Array<AbstractFilter> = [];
+		if (cloneExprSmokeEarly != null) filters.push(cloneExprSmokeEarly);
+		filters = filters.concat([
 			detectFieldRedefinitions,
 			new RewriteRedefinedPrivate.RenameRedefinedFields(context, detectFieldRedefinitions),
 			new RewriteAssignOps(context),
@@ -37,7 +42,10 @@ class Filters {
 			new RewriteArrayAccess(context),
 			new RewriteAs(context),
 			new RewriteIs(context),
-			new RewriteCFor(context),
+			new RewriteCFor(context)
+		]);
+		if (cloneExprSmokeLate != null) filters.push(cloneExprSmokeLate);
+		filters = filters.concat([
 			new RewriteForIn(context),
 			new RewriteHasOwnProperty(context),
 			new NumberToInt(context),
@@ -66,7 +74,9 @@ class Filters {
 			new CheckUntypedMethodCalls(context),
 			new RemoveRedundantParenthesis(context),
 			new FixImports(context)
-		]) {
+		]);
+
+		for (f in filters) {
 			f.run(tree);
 		}
 

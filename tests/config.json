@@ -3,5 +3,6 @@
   "hxout": "tests/out",
   "swc": [
     "tests/lib/airglobal.swc"
-  ]
+  ],
+  "testCloneExpr": true
 }

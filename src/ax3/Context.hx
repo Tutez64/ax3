@@ -51,6 +51,7 @@ typedef Config = {
 	var ?hxoutClean:Bool;
 	var ?dataoutClean:Bool;
 	var ?formatter:Bool;
+	var ?testCloneExpr:Bool;
 	var ?copy:Array<{unit: String, to: String}>;
 }
 
