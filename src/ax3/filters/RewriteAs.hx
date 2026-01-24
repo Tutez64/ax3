@@ -65,6 +65,10 @@ class RewriteAs extends AbstractFilter {
 							closeParen: mkCloseParen(removeTrailingTrivia(e))
 						}));
 
+					case TTXML | TTXMLList:
+						// XML types are abstracts, so a runtime `as` check is not reliable.
+						e.with(kind = TEHaxeRetype(eobj));
+
 					case TTDictionary(k, v):
 						if (k != TTAny || v != TTAny) throwError(exprPos(e), "assert"); // only untyped Dictionary can come from the AS3 `as` cast
 						var eAsDictMethod = mkBuiltin("ASDictionary.asDictionary", TTFunction, removeLeadingTrivia(e));
