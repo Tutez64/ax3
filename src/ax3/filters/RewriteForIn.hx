@@ -177,6 +177,15 @@ class RewriteForIn extends AbstractFilter {
 
 		var loopVarType;
 		switch eobj.type {
+			case TTInst(cls) if (hasInstanceFunction(cls, "keyIterator")):
+				eobj = mkIteratorMethodCallExpr(eobj, "keyIterator");
+				loopVarType = TTAny;
+
+			case TTInst(cls) if (isDynamicIterateeClass(cls)):
+				var retyped = mk(TEHaxeRetype(eobj), TTAny, TTAny);
+				eobj = mkIteratorMethodCallExpr(retyped, "___keys");
+				loopVarType = TTString;
+
 			case TTDictionary(keyType, _):
 				eobj = mkIteratorMethodCallExpr(eobj, "keys");
 				loopVarType = keyType;
@@ -230,6 +239,14 @@ class RewriteForIn extends AbstractFilter {
 
 		var loopVarType;
 		switch eobj.type {
+			case TTInst(cls) if (hasInstanceFunction(cls, "iterator")):
+				eobj = mkIteratorMethodCallExpr(eobj, "iterator");
+				loopVarType = TTAny;
+
+			case TTInst(cls) if (isDynamicIterateeClass(cls)):
+				eobj = mk(TEHaxeRetype(eobj), TTAny, TTAny);
+				loopVarType = TTAny;
+
 			case TTAny:
 				loopVarType = TTAny;
 			case TTArray(t) | TTVector(t) | TTDictionary(_, t) | TTObject(t):
@@ -251,6 +268,35 @@ class RewriteForIn extends AbstractFilter {
 				closeParen: f.syntax.closeParen
 			}
 		};
+	}
+
+	static function isDynamicIterateeClass(cls:TClassOrInterfaceDecl):Bool {
+		if (Lambda.exists(cls.modifiers, function(m) return m.match(DMDynamic(_)))) {
+			return true;
+		}
+		return extendsProxy(cls);
+	}
+
+	static function hasInstanceFunction(cls:TClassOrInterfaceDecl, name:String):Bool {
+		var found = cls.findFieldInHierarchy(name, false);
+		return found != null && found.field.kind.match(TFFun(_));
+	}
+
+	static function extendsProxy(cls:TClassOrInterfaceDecl):Bool {
+		return switch cls.kind {
+			case TClass(info):
+				if (info.extend == null) {
+					false;
+				} else {
+					var parent = info.extend.superClass;
+					if (parent.name == "Proxy" && parent.parentModule.parentPack.name == "flash.utils") {
+						true;
+					} else {
+						extendsProxy(parent);
+					}
+				}
+			case _: false;
+		}
 	}
 
 	static inline function mkIteratorMethodCallExpr(eobj:TExpr, methodName:String):TExpr {
