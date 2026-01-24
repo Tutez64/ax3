@@ -6,6 +6,7 @@ import ax3.Token;
 class Parser {
 	var scanner:Scanner;
 	var path:String;
+	var knownNamespaces = new Map<String, Bool>();
 
 	public function new(scanner, path) {
 		this.scanner = scanner;
@@ -48,10 +49,17 @@ class Parser {
 				case [TkIdent, "const"]:
 					return DVar(parseModuleVarDeclNext(metadata, modifiers, VConst(scanner.consume())));
 				case [TkIdent, "namespace"]:
+					var keyword = scanner.consume();
+					var name = expectKind(TkIdent);
+					knownNamespaces.set(name.text, true);
+					if (scanner.advance().kind == TkEquals) {
+						scanner.consume();
+						parseExpr(false);
+					}
 					return DNamespace({
 						modifiers: modifiers,
-						keyword: scanner.consume(),
-						name: expectKind(TkIdent),
+						keyword: keyword,
+						name: name,
 						semicolon: expectKind(TkSemicolon)
 					});
 				case _:
@@ -143,6 +151,7 @@ class Parser {
 	function parseUseNamespace(useKeyword:Token):UseNamespace {
 		var namespaceKeyword = expectKeyword("namespace");
 		var name = expectKind(TkIdent);
+		knownNamespaces.set(name.text, true);
 		return {
 			useKeyword: useKeyword,
 			namespaceKeyword: namespaceKeyword,
@@ -307,6 +316,7 @@ class Parser {
 							if (namespace != null)
 								throw "Namespace already defined";
 							namespace = token;
+							knownNamespaces.set(token.text, true);
 					}
 			}
 		}
@@ -623,15 +633,25 @@ class Parser {
 	function parseActualIdent(token:Token, allowComma:Bool):Expr {
 		switch scanner.advance().kind {
 			case TkColonColon:
-				// conditional compilation
 				var sep = scanner.consume();
 				var name = expectKind(TkIdent);
-				var condComp = {ns: token, sep: sep, name: name};
-				switch scanner.advance().kind {
-					case TkBraceOpen:
-						return ECondCompBlock(condComp, parseBracedExprBlock(scanner.consume()));
-					case _:
-						return ECondCompValue(condComp);
+				if (knownNamespaces.exists(token.text)) {
+					name.leadTrivia = token.leadTrivia
+						.concat(token.trailTrivia)
+						.concat(sep.leadTrivia)
+						.concat(sep.trailTrivia)
+						.concat([new Trivia(TrBlockComment, "/*" + token.text + "::*/")])
+						.concat(name.leadTrivia);
+					return parseExprNext(EIdent(name), allowComma);
+				} else {
+					// conditional compilation
+					var condComp = {ns: token, sep: sep, name: name};
+					switch scanner.advance().kind {
+						case TkBraceOpen:
+							return ECondCompBlock(condComp, parseBracedExprBlock(scanner.consume()));
+						case _:
+							return ECondCompValue(condComp);
+					}
 				}
 			case _:
 				// just an indentifier
@@ -972,7 +992,20 @@ class Parser {
 								throw "Invalid @ syntax: @field or @[expr] expected";
 						}
 					case TkIdent:
-						return parseExprNext(EField(first, dot, scanner.consume()), allowComma);
+						var nameToken = scanner.consume();
+						if (scanner.advance().kind == TkColonColon) {
+							var sep = scanner.consume();
+							var fieldToken = expectKind(TkIdent);
+							dot.trailTrivia = dot.trailTrivia
+								.concat(nameToken.leadTrivia)
+								.concat(nameToken.trailTrivia)
+								.concat(sep.leadTrivia)
+								.concat(sep.trailTrivia)
+								.concat([new Trivia(TrBlockComment, "/*" + nameToken.text + "::*/")]);
+							return parseExprNext(EField(first, dot, fieldToken), allowComma);
+						} else {
+							return parseExprNext(EField(first, dot, nameToken), allowComma);
+						}
 					case _:
 						throw "Invalid dot access expression: fieldName or @fieldName expected";
 				}

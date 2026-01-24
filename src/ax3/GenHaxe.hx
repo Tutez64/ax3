@@ -335,7 +335,9 @@ class GenHaxe extends PrinterBase {
 
 		printMetadata(f.metadata);
 
-		if (f.namespace != null) throwError(f.namespace.pos, "Unprocessed namespace modifier");
+		if (f.namespace != null) {
+			printTextWithTrivia("/*namespace " + f.namespace.text + "*/", f.namespace);
+		}
 
 		for (m in f.modifiers) {
 			switch (m) {
