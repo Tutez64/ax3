@@ -287,16 +287,21 @@ class ASArray {
 		return a;
 	}
 
-	public static inline function sortOn<T>(a:Array<T>, fieldName:String, options:Int):Array<T> {
-		// TODO: this will only work on Flash, but we need it to _compile_ on JS too for now, so `RectanglePacker` is not breaking the build :-P
+	public static inline function sortOn<T>(a:Array<T>, fieldName:Dynamic, options:Dynamic):Array<T> {
+		#if flash
 		return (cast a).sortOn(fieldName, options);
+		#else
+		return ASSortTools.sortOn(a, fieldName, options);
+		#end
 	}
 
-	#if flash // TODO: implement for other targets
 	public static inline function sortWithOptions<T>(a:Array<T>, options:Int):Array<T> {
+		#if flash
 		return (cast a).sort(options);
+		#else
+		return ASSortTools.sortWithOptions(a, options, function(v) return v);
+		#end
 	}
-	#end
 
 	public static macro function pushMultiple<T>(a:ExprOf<Array<T>>, first:ExprOf<T>, rest:Array<ExprOf<T>>):ExprOf<Int>;
 	public static macro function unshiftMultiple<T>(a:ExprOf<Array<T>>, first:ExprOf<T>, rest:Array<ExprOf<T>>):ExprOf<Int>;
@@ -309,11 +314,21 @@ class ASVector {
 		return a;
 	}
 
-	#if flash // TODO: implement for other targets
 	public static inline function sortWithOptions<T>(a:flash.Vector<T>, options:Int):flash.Vector<T> {
+		#if flash
 		return (cast a).sort(options);
+		#else
+		if ((options & ASArray.RETURNINDEXEDARRAY) != 0) {
+			return a;
+		}
+		var items = [for (i in 0...a.length) a[i]];
+		ASSortTools.sortWithOptions(items, options, function(v) return v);
+		for (i in 0...items.length) {
+			a[i] = items[i];
+		}
+		return a;
+		#end
 	}
-	#end
 }
 
 class ASVectorTools {
@@ -383,6 +398,219 @@ class ASVectorTools {
 		}
 		return false;
 		#end
+	}
+}
+
+private class ASSortTools {
+	public static function sortOn<T>(a:Array<T>, fieldName:Dynamic, options:Dynamic):Array<T> {
+		var fields = normalizeFieldNames(fieldName);
+		var opts = normalizeOptions(options, fields.length);
+		var fieldOptions = opts.fieldOptions;
+		var globalOptions = opts.globalOptions;
+
+		if (fields.length == 0) {
+			return a;
+		}
+
+		if ((globalOptions & ASArray.RETURNINDEXEDARRAY) != 0) {
+			var indices = [for (i in 0...a.length) i];
+			indices.sort(function(i, j) {
+				return compareByFields(a[i], a[j], fields, fieldOptions);
+			});
+			if ((globalOptions & ASArray.UNIQUESORT) != 0 && hasDuplicateIndicesByFields(indices, a, fields, fieldOptions)) {
+				return a;
+			}
+			return cast indices;
+		}
+
+		var sorted = a.copy();
+		sorted.sort(function(x, y) {
+			return compareByFields(x, y, fields, fieldOptions);
+		});
+		if ((globalOptions & ASArray.UNIQUESORT) != 0 && hasDuplicateValuesByFields(sorted, fields, fieldOptions)) {
+			return a;
+		}
+		for (i in 0...sorted.length) {
+			a[i] = sorted[i];
+		}
+		return a;
+	}
+
+	public static function sortWithOptions<T>(a:Array<T>, options:Int, valueFn:T->Dynamic):Array<T> {
+		if ((options & ASArray.RETURNINDEXEDARRAY) != 0) {
+			var indices = [for (i in 0...a.length) i];
+			indices.sort(function(i, j) {
+				return compareValues(valueFn(a[i]), valueFn(a[j]), options);
+			});
+			if ((options & ASArray.UNIQUESORT) != 0 && hasDuplicateIndices(indices, a, valueFn, options)) {
+				return a;
+			}
+			return cast indices;
+		}
+
+		var sorted = a.copy();
+		sorted.sort(function(x, y) {
+			return compareValues(valueFn(x), valueFn(y), options);
+		});
+		if ((options & ASArray.UNIQUESORT) != 0 && hasDuplicateValues(sorted, valueFn, options)) {
+			return a;
+		}
+		for (i in 0...sorted.length) {
+			a[i] = sorted[i];
+		}
+		return a;
+	}
+
+	static function normalizeFieldNames(fieldName:Dynamic):Array<String> {
+		if (fieldName == null) {
+			return [];
+		}
+		if (Std.isOfType(fieldName, Array)) {
+			var values:Array<Dynamic> = cast fieldName;
+			return [for (v in values) Std.string(v)];
+		}
+		return [Std.string(fieldName)];
+	}
+
+	static function normalizeOptions(options:Dynamic, fieldCount:Int):{fieldOptions:Array<Int>, globalOptions:Int} {
+		var fieldOptions:Array<Int> = [];
+		var globalOptions = 0;
+		if (options == null) {
+			for (i in 0...fieldCount) {
+				fieldOptions.push(0);
+			}
+			return {fieldOptions: fieldOptions, globalOptions: 0};
+		}
+
+		if (Std.isOfType(options, Array)) {
+			var values:Array<Dynamic> = cast options;
+			for (i in 0...fieldCount) {
+				var v = if (i < values.length && values[i] != null) Std.int(values[i]) else 0;
+				fieldOptions.push(v);
+				globalOptions |= v;
+			}
+			return {fieldOptions: fieldOptions, globalOptions: globalOptions};
+		}
+
+		var v = Std.int(options);
+		for (i in 0...fieldCount) {
+			fieldOptions.push(v);
+		}
+		return {fieldOptions: fieldOptions, globalOptions: v};
+	}
+
+	static function compareByFields(a:Dynamic, b:Dynamic, fields:Array<String>, options:Array<Int>):Int {
+		for (i in 0...fields.length) {
+			var key = fields[i];
+			var opts = if (i < options.length) options[i] else 0;
+			var left = Reflect.getProperty(a, key);
+			var right = Reflect.getProperty(b, key);
+			var result = compareValues(left, right, opts);
+			if (result != 0) {
+				return result;
+			}
+		}
+		return 0;
+	}
+
+	static function hasDuplicateValuesByFields<T>(sorted:Array<T>, fields:Array<String>, options:Array<Int>):Bool {
+		if (sorted.length < 2) {
+			return false;
+		}
+		var prev = sorted[0];
+		for (i in 1...sorted.length) {
+			var cur = sorted[i];
+			if (compareByFields(prev, cur, fields, options) == 0) {
+				return true;
+			}
+			prev = cur;
+		}
+		return false;
+	}
+
+	static function hasDuplicateIndicesByFields<T>(indices:Array<Int>, a:Array<T>, fields:Array<String>, options:Array<Int>):Bool {
+		if (indices.length < 2) {
+			return false;
+		}
+		var prev = indices[0];
+		for (i in 1...indices.length) {
+			var cur = indices[i];
+			if (compareByFields(a[prev], a[cur], fields, options) == 0) {
+				return true;
+			}
+			prev = cur;
+		}
+		return false;
+	}
+
+	static function hasDuplicateValues<T>(sorted:Array<T>, valueFn:T->Dynamic, options:Int):Bool {
+		if (sorted.length < 2) {
+			return false;
+		}
+		var prev = valueFn(sorted[0]);
+		for (i in 1...sorted.length) {
+			var cur = valueFn(sorted[i]);
+			if (compareValues(prev, cur, options) == 0) {
+				return true;
+			}
+			prev = cur;
+		}
+		return false;
+	}
+
+	static function hasDuplicateIndices<T>(indices:Array<Int>, a:Array<T>, valueFn:T->Dynamic, options:Int):Bool {
+		if (indices.length < 2) {
+			return false;
+		}
+		var prev = valueFn(a[indices[0]]);
+		for (i in 1...indices.length) {
+			var cur = valueFn(a[indices[i]]);
+			if (compareValues(prev, cur, options) == 0) {
+				return true;
+			}
+			prev = cur;
+		}
+		return false;
+	}
+
+	static function compareValues(a:Dynamic, b:Dynamic, options:Int):Int {
+		if (a == b) {
+			return 0;
+		}
+		if (a == null) {
+			return -1;
+		}
+		if (b == null) {
+			return 1;
+		}
+
+		var result = if ((options & ASArray.NUMERIC) != 0) {
+			compareNumeric(a, b, options);
+		} else {
+			compareStrings(Std.string(a), Std.string(b), (options & ASArray.CASEINSENSITIVE) != 0);
+		}
+
+		if ((options & ASArray.DESCENDING) != 0) {
+			result = -result;
+		}
+		return result;
+	}
+
+	static function compareNumeric(a:Dynamic, b:Dynamic, options:Int):Int {
+		var fa = Std.parseFloat(Std.string(a));
+		var fb = Std.parseFloat(Std.string(b));
+		if (Math.isNaN(fa) || Math.isNaN(fb)) {
+			return compareStrings(Std.string(a), Std.string(b), (options & ASArray.CASEINSENSITIVE) != 0);
+		}
+		return if (fa < fb) -1 else if (fa > fb) 1 else 0;
+	}
+
+	static function compareStrings(a:String, b:String, caseInsensitive:Bool):Int {
+		if (caseInsensitive) {
+			a = a.toLowerCase();
+			b = b.toLowerCase();
+		}
+		return if (a < b) -1 else if (a > b) 1 else 0;
 	}
 }
 

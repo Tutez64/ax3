@@ -16,4 +16,41 @@ class TestASCompat extends utest.Test {
 	function testIsAnyVector() {
 		isTrue(ASCompat.isVector(new flash.Vector<String>(), (_:ASAny)));
 	}
+
+	function testArraySortWithOptions() {
+		var values = [3, 1, 2];
+		ASCompat.ASArray.sortWithOptions(values, ASCompat.ASArray.NUMERIC | ASCompat.ASArray.DESCENDING);
+		equals(3, values[0]);
+		equals(2, values[1]);
+		equals(1, values[2]);
+	}
+
+	function testArraySortOn() {
+		var values = [{n: "b"}, {n: "A"}, {n: "c"}];
+		ASCompat.ASArray.sortOn(values, "n", ASCompat.ASArray.CASEINSENSITIVE);
+		equals("A", values[0].n);
+		equals("b", values[1].n);
+		equals("c", values[2].n);
+	}
+
+	function testArraySortOnMulti() {
+		var values = [
+			{a: 1, b: 2},
+			{a: 1, b: 1},
+			{a: 0, b: 5}
+		];
+		ASCompat.ASArray.sortOn(values, ["a", "b"], [ASCompat.ASArray.NUMERIC, ASCompat.ASArray.NUMERIC | ASCompat.ASArray.DESCENDING]);
+		equals(0, values[0].a);
+		equals(2, values[1].b);
+		equals(1, values[2].b);
+	}
+
+	function testArraySortReturnIndexed() {
+		var values = ["b", "a", "c"];
+		var indices:Array<Int> = cast ASCompat.ASArray.sortWithOptions(values, ASCompat.ASArray.RETURNINDEXEDARRAY);
+		equals("b", values[0]);
+		equals(1, indices[0]);
+		equals(0, indices[1]);
+		equals(2, indices[2]);
+	}
 }

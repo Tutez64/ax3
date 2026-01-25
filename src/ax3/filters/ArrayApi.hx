@@ -2,7 +2,7 @@ package ax3.filters;
 
 class ArrayApi extends AbstractFilter {
 	static final tResize = TTFun([TTInt], TTVoid);
-	static final tSortOn = TTFun([TTArray(TTAny), TTString, TTInt], TTArray(TTAny));
+	static final tSortOn = TTFun([TTArray(TTAny), TTAny, TTAny], TTArray(TTAny));
 	static final tInsert = TTFun([TTInt, TTAny], TTVoid);
 	static final eReflectCompare = mkBuiltin("Reflect.compare", TTFun([TTAny, TTAny], TTInt));
 
@@ -18,12 +18,25 @@ class ArrayApi extends AbstractFilter {
 			// sortOn
 			case TECall({kind: TEField({kind: TOExplicit(dot, eArray = {type: TTArray(_)})}, "sortOn", fieldToken)}, args):
 				switch args.args {
-					case [eFieldName = {expr: {type: TTString}}, eOptions = {expr: {type: TTInt | TTUint}}]:
+					case [eFieldName = {expr: {type: TTString | TTArray(_) | TTAny | TTObject(TTAny)}}, eOptions = {expr: {type: TTInt | TTUint | TTArray(_) | TTAny | TTObject(TTAny)}}]:
 						var eCompatArray = mkBuiltin("ASCompat.ASArray", TTBuiltin, removeLeadingTrivia(eArray));
 						var fieldObj = {kind: TOExplicit(dot, eCompatArray), type: eCompatArray.type};
 						var eMethod = mk(TEField(fieldObj, "sortOn", fieldToken), tSortOn, tSortOn);
 						e.with(kind = TECall(eMethod, args.with(args = [
 							{expr: eArray, comma: commaWithSpace}, eFieldName, eOptions
+						])));
+					case [eFieldName = {expr: {type: TTString | TTArray(_) | TTAny | TTObject(TTAny)}}]:
+						var eCompatArray = mkBuiltin("ASCompat.ASArray", TTBuiltin, removeLeadingTrivia(eArray));
+						var fieldObj = {kind: TOExplicit(dot, eCompatArray), type: eCompatArray.type};
+						var eMethod = mk(TEField(fieldObj, "sortOn", fieldToken), tSortOn, tSortOn);
+						var trail = removeTrailingTrivia(eFieldName.expr);
+						var eDefaultOptions = {
+							expr: mk(TELiteral(TLInt(new Token(0, TkDecimalInteger, "0", [], trail))), TTInt, TTInt),
+							comma: null
+						};
+						var eFieldNameArg = {expr: eFieldName.expr, comma: commaWithSpace};
+						e.with(kind = TECall(eMethod, args.with(args = [
+							{expr: eArray, comma: commaWithSpace}, eFieldNameArg, eDefaultOptions
 						])));
 					case _:
 						throwError(exprPos(e), "Unsupported Array.sortOn arguments");
