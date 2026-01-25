@@ -41,6 +41,18 @@ class TestXML extends utest.Test {
 		equals("<li>1</li>\n<li>2</li>", x.child("li").toXMLString());
 	}
 
+		function testHasOwnProperty() {
+			var x = new compat.XML('<root id="r"><item id="1"/><item><sub/></item><other/></root>');
+			isFalse(x.hasOwnProperty("id"));
+			isTrue(x.hasOwnProperty("item"));
+			isFalse(x.hasOwnProperty("missing"));
+
+			var list = x.child("item");
+			isFalse(list.hasOwnProperty("id"));
+			isTrue(list.hasOwnProperty("sub"));
+			isFalse(list.hasOwnProperty("missing"));
+		}
+
 	function testChildren() {
 		var x = new compat.XML('<ul><li>1</li><notli/><li>2</li></ul>');
 		equals("<li>1</li>\n<notli/>\n<li>2</li>", x.children().toXMLString());

@@ -134,6 +134,18 @@ abstract XML(XMLImpl) from XMLImpl to XMLImpl {
 		#end
 	}
 
+	public function hasOwnProperty(name:String):Bool {
+		#if flash
+		return untyped this.hasOwnProperty(name);
+		#else
+		if (this == null) {
+			return false;
+		}
+		var it = this.elementsNamed(name);
+		return it.hasNext();
+		#end
+	}
+
 	public inline function namespace():Any return null; // todo
 
 }

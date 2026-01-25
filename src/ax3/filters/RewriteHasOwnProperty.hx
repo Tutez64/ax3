@@ -31,7 +31,7 @@ class RewriteHasOwnProperty extends AbstractFilter {
 									args
 								));
 
-							case TTObject(_) | TTAny:
+							case TTObject(_) | TTAny | TTXML | TTXMLList:
 								reportError(exprPos(e), "untyped hasOwnProperty detected");
 								e.with(kind = TECall(
 									eField.with(kind = TEField(obj.with(kind = TOExplicit(dot, eobj)), "hasOwnProperty", fieldToken)),

@@ -97,4 +97,19 @@ abstract XMLList(XMLListImpl) from XMLListImpl to XMLListImpl {
 		return this.iterator();
 		#end
 	}
+
+	public function hasOwnProperty(name:String):Bool {
+		#if flash
+		return untyped this.hasOwnProperty(name);
+		#else
+		for (x in this) {
+			var xml:StdXml = x;
+			var it = xml.elementsNamed(name);
+			if (it.hasNext()) {
+				return true;
+			}
+		}
+		return false;
+		#end
+	}
 }
