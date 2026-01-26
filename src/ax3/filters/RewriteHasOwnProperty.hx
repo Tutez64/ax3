@@ -14,6 +14,24 @@ class RewriteHasOwnProperty extends AbstractFilter {
 					closeParen: mkCloseParen(removeTrailingTrivia(edict))
 				}));
 
+			case TEBinop(ekey, OpIn(_), eobj):
+				ekey = processExpr(ekey);
+				eobj = processExpr(eobj);
+				processLeadingToken(t -> t.leadTrivia = removeLeadingTrivia(ekey).concat(t.leadTrivia), eobj);
+				var trail = removeTrailingTrivia(eobj);
+
+				switch eobj.type {
+					case TTObject(TTAny) | TTAny | TTXML | TTXMLList:
+						mkHasOwnPropertyCall(e, eobj, ekey, trail);
+
+					case TTObject(_):
+						mkExistsCall(e, eobj, ekey, trail, TTString);
+
+					case _:
+						var eobjAny = if (eobj.type == TTAny) eobj else eobj.with(kind = TEHaxeRetype(eobj), type = TTAny);
+						mkHasOwnPropertyCall(e, eobjAny, ekey, trail);
+				}
+
 			case TECall(eField = {kind: TEField(obj, "hasOwnProperty", fieldToken)}, args):
 				switch obj.kind {
 					case TOExplicit(dot, eobj):
@@ -77,5 +95,25 @@ class RewriteHasOwnProperty extends AbstractFilter {
 			case _:
 				mapExpr(processExpr, e);
 		}
+	}
+
+	function mkExistsCall(e:TExpr, eobj:TExpr, ekey:TExpr, trail:Array<Trivia>, expectedKeyType:Null<TType>):TExpr {
+		var keyArg = if (expectedKeyType == null) ekey else ekey.with(expectedType = expectedKeyType);
+		var eExistsMethod = mk(TEField({kind: TOExplicit(mkDot(), eobj), type: eobj.type}, "exists", mkIdent("exists")), TTFunction, TTFunction);
+		return e.with(kind = TECall(eExistsMethod, {
+			openParen: mkOpenParen(),
+			args: [{expr: keyArg, comma: null}],
+			closeParen: mkCloseParen(trail)
+		}));
+	}
+
+	function mkHasOwnPropertyCall(e:TExpr, eobj:TExpr, ekey:TExpr, trail:Array<Trivia>):TExpr {
+		var keyArg = if (ekey.type == TTString) ekey else ekey.with(expectedType = TTString);
+		var eHasOwnProperty = mk(TEField({kind: TOExplicit(mkDot(), eobj), type: eobj.type}, "hasOwnProperty", mkIdent("hasOwnProperty")), TTFunction, TTFunction);
+		return e.with(kind = TECall(eHasOwnProperty, {
+			openParen: mkOpenParen(),
+			args: [{expr: keyArg, comma: null}],
+			closeParen: mkCloseParen(trail)
+		}));
 	}
 }
