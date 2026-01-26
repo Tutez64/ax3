@@ -239,43 +239,325 @@ class GenHaxe extends PrinterBase {
 		}
 		printOpenBrace(c.syntax.openBrace);
 
-		var staticInits = [];
+		var classIndent = triviaIndent(c.syntax.closeBrace.leadTrivia);
+		var memberIndent = getClassMemberIndent(c, classIndent);
+		var indentUnit = if (memberIndent.length > classIndent.length && memberIndent.startsWith(classIndent))
+			memberIndent.substr(classIndent.length)
+		else
+			"\t";
+		if (indentUnit == "") indentUnit = "\t";
+		var innerIndent = memberIndent + indentUnit;
+		var staticInitNameCounts = new Map<String, Int>();
+		var pendingStaticInitGroup:Array<{expr:TExpr}> = [];
+		var pendingStaticInitBase = "";
+		var hasPendingStaticInit = false;
+
+		function flushStaticInitGroup() {
+			if (hasPendingStaticInit && pendingStaticInitGroup.length > 0) {
+				var name = nextStaticInitName(pendingStaticInitBase, staticInitNameCounts);
+				printStaticInitGroup(pendingStaticInitGroup, name, memberIndent, innerIndent);
+				pendingStaticInitGroup = [];
+				pendingStaticInitBase = "";
+				hasPendingStaticInit = false;
+			}
+		}
 
 		for (m in c.members) {
 			switch (m) {
 				case TMCondCompBegin(b):
+					flushStaticInitGroup();
 					printCondCompBegin(b);
 
 				case TMCondCompEnd(b):
+					flushStaticInitGroup();
 					printCompCondEnd(b);
 
 				case TMField(f):
+					flushStaticInitGroup();
 					printClassField(c.name, f);
 
 				case TMUseNamespace(n, semicolon):
+					flushStaticInitGroup();
 					printUseNamespace(n);
 					printTextWithTrivia("", semicolon);
 
 				case TMStaticInit(i):
-					staticInits.push(i);
+					var base = staticInitBaseName(i.expr);
+					if (hasPendingStaticInit && pendingStaticInitBase == base) {
+						pendingStaticInitGroup.push(i);
+					} else {
+						flushStaticInitGroup();
+						pendingStaticInitGroup = [i];
+						pendingStaticInitBase = base;
+						hasPendingStaticInit = true;
+					}
 			}
 		}
-
-		if (staticInits.length > 0) {
-			buf.add("\n\tstatic final ___init = {\n");
-			for (i in staticInits) {
-				printTrivia(TypedTreeTools.removeLeadingTrivia(i.expr));
-				var trailTrivia = TypedTreeTools.removeTrailingTrivia(i.expr);
-				printExpr(i.expr);
-				printTrivia(trailTrivia);
-			}
-			if (needsSemicolon(staticInits[staticInits.length - 1].expr)) {
-				buf.add(";");
-			}
-			buf.add("\n\tnull;\n\t};\n");
-		}
+		flushStaticInitGroup();
 
 		printCloseBrace(c.syntax.closeBrace);
+	}
+
+	function printStaticInitGroup(group:Array<{expr:TExpr}>, name:String, memberIndent:String, innerIndent:String) {
+		var leadTrivia = takeStaticInitLeadTrivia(group[0].expr);
+		printTrivia(leadTrivia);
+		buf.add("static final ");
+		buf.add(name);
+		buf.add(" = {\n");
+
+		var prevEndedWithNewline = false;
+		var isFirstExpr = true;
+		var isFirstItem = true;
+
+		function printStaticInitExpr(expr:TExpr, leadOverride:Null<Array<Trivia>>) {
+			switch expr.kind {
+				case TEBlock(block):
+					var blockTrailTrivia = TypedTreeTools.removeTrailingTrivia(expr);
+					printTrivia(block.syntax.openBrace.trailTrivia);
+					block.syntax.openBrace.trailTrivia = [];
+					var isFirstInBlock = true;
+					for (e in block.exprs) {
+						var exprLead = TypedTreeTools.removeLeadingTrivia(e.expr);
+						var combinedLead = if (leadOverride != null && isFirstInBlock) leadOverride.concat(exprLead) else exprLead;
+						var needsLeadingNewline = !isFirstExpr && !prevEndedWithNewline;
+						printTrivia(normalizeStaticInitLead(combinedLead, needsLeadingNewline, innerIndent));
+						printExpr(e.expr);
+						var exprTrail = TypedTreeTools.removeTrailingTrivia(e.expr);
+						printTrivia(exprTrail);
+						if (e.semicolon != null) {
+							var semicolonTrail = e.semicolon.trailTrivia;
+							e.semicolon.trailTrivia = stripTrailingIndentAfterNewline(semicolonTrail);
+							printSemicolon(e.semicolon);
+							e.semicolon.trailTrivia = semicolonTrail;
+							prevEndedWithNewline = triviaEndsWithNewline(semicolonTrail);
+						} else if (needsSemicolon(e.expr)) {
+							buf.add(";");
+							prevEndedWithNewline = false;
+						} else {
+							prevEndedWithNewline = triviaEndsWithNewline(exprTrail);
+						}
+						isFirstExpr = false;
+						isFirstInBlock = false;
+					}
+					if (block.exprs.length == 0 && leadOverride != null) {
+						var needsLeadingNewline = !isFirstExpr && !prevEndedWithNewline;
+						printTrivia(normalizeStaticInitLead(leadOverride, needsLeadingNewline, innerIndent));
+						prevEndedWithNewline = triviaEndsWithNewline(leadOverride);
+						isFirstExpr = false;
+					}
+					var closeLead = block.syntax.closeBrace.leadTrivia;
+					printTrivia(closeLead);
+					block.syntax.closeBrace.leadTrivia = [];
+					printTrivia(blockTrailTrivia);
+					if (!prevEndedWithNewline && (triviaEndsWithNewline(closeLead) || triviaEndsWithNewline(blockTrailTrivia))) {
+						prevEndedWithNewline = true;
+					}
+				case _:
+					var exprLead = TypedTreeTools.removeLeadingTrivia(expr);
+					var combinedLead = if (leadOverride != null) leadOverride.concat(exprLead) else exprLead;
+					var needsLeadingNewline = !isFirstExpr && !prevEndedWithNewline;
+					printTrivia(normalizeStaticInitLead(combinedLead, needsLeadingNewline, innerIndent));
+					printExpr(expr);
+					var exprTrail = TypedTreeTools.removeTrailingTrivia(expr);
+					printTrivia(exprTrail);
+					if (needsSemicolon(expr)) {
+						buf.add(";");
+						prevEndedWithNewline = false;
+					} else {
+						prevEndedWithNewline = triviaEndsWithNewline(exprTrail);
+					}
+					isFirstExpr = false;
+			}
+		}
+
+		for (i in group) {
+			var leadOverride = if (isFirstItem) null else takeStaticInitLeadTrivia(i.expr);
+			printStaticInitExpr(i.expr, leadOverride);
+			isFirstItem = false;
+		}
+
+		if (!prevEndedWithNewline) {
+			buf.add("\n");
+		}
+		buf.add(innerIndent);
+		buf.add("null;\n");
+		buf.add(memberIndent);
+		buf.add("};\n");
+	}
+
+	function getClassMemberIndent(c:TClassOrInterfaceDecl, classIndent:String):String {
+		for (m in c.members) {
+			switch (m) {
+				case TMField(f):
+					return triviaIndent(TypedTreeTools.getFieldLeadingToken(f).leadTrivia);
+				case TMUseNamespace(n, _):
+					return triviaIndent(n.useKeyword.leadTrivia);
+				case TMStaticInit(i):
+					return triviaIndent(getStaticInitMemberLead(i.expr));
+				case TMCondCompBegin(b):
+					return triviaIndent(b.openBrace.leadTrivia);
+				case TMCondCompEnd(_):
+			}
+		}
+		return classIndent + "\t";
+	}
+
+	function getStaticInitMemberLead(expr:TExpr):Array<Trivia> {
+		return switch expr.kind {
+			case TEBlock(block):
+				if (block.syntax.openBrace.pos >= 0) block.syntax.openBrace.leadTrivia
+				else if (block.exprs.length > 0) TypedTreeTools.processLeadingToken(t -> t.leadTrivia, block.exprs[0].expr)
+				else block.syntax.openBrace.leadTrivia;
+			case _:
+				TypedTreeTools.processLeadingToken(t -> t.leadTrivia, expr);
+		}
+	}
+
+	function takeStaticInitLeadTrivia(expr:TExpr):Array<Trivia> {
+		return switch expr.kind {
+			case TEBlock(block):
+				if (block.syntax.openBrace.pos >= 0) TypedTreeTools.removeLeadingTrivia(expr)
+				else if (block.exprs.length > 0) TypedTreeTools.removeLeadingTrivia(block.exprs[0].expr)
+				else TypedTreeTools.removeLeadingTrivia(expr);
+			case _:
+				TypedTreeTools.removeLeadingTrivia(expr);
+		}
+	}
+
+	function staticInitBaseName(expr:TExpr):String {
+		var base = "___init";
+		var hint = staticInitNameHint(expr);
+		if (hint != null && hint != "") {
+			var sanitized = sanitizeStaticInitName(hint);
+			if (sanitized != "") base = base + "_" + sanitized;
+		}
+		return base;
+	}
+
+	function nextStaticInitName(base:String, counts:Map<String, Int>):String {
+		var count = counts.get(base);
+		if (count == null) {
+			counts.set(base, 1);
+			return base;
+		}
+		var nextIndex = count + 1;
+		counts.set(base, nextIndex);
+		return base + "_" + nextIndex;
+	}
+
+	function staticInitNameHint(expr:TExpr):Null<String> {
+		return switch expr.kind {
+			case TEParens(_, inner, _):
+				staticInitNameHint(inner);
+			case TEBlock(block):
+				if (block.exprs.length == 1) staticInitNameHint(block.exprs[0].expr) else null;
+			case TEBinop(a, OpAssign(_) | OpAssignOp(_), _):
+				staticInitNameFromLhs(a);
+			case TEVars(_, vars):
+				if (vars.length > 0) vars[0].v.name else null;
+			case _:
+				null;
+		}
+	}
+
+	function staticInitNameFromLhs(expr:TExpr):Null<String> {
+		return switch expr.kind {
+			case TEParens(_, inner, _):
+				staticInitNameFromLhs(inner);
+			case TELocal(_, v):
+				v.name;
+			case TEField(_, fieldName, _):
+				fieldName;
+			case TEDeclRef(path, _):
+				var parts = ParseTree.dotPathToArray(path);
+				if (parts.length > 0) parts[parts.length - 1] else null;
+			case TEArrayAccess(a):
+				staticInitNameFromLhs(a.eobj);
+			case TECall(eobj, _):
+				staticInitNameFromLhs(eobj);
+			case TEBuiltin(_, name):
+				name;
+			case TEHaxeRetype(e):
+				staticInitNameFromLhs(e);
+			case _:
+				null;
+		}
+	}
+
+	function sanitizeStaticInitName(name:String):String {
+		var buf = new StringBuf();
+		for (i in 0...name.length) {
+			var code = name.charCodeAt(i);
+			if (code == null) continue;
+			var isAlpha = (code >= 65 && code <= 90) || (code >= 97 && code <= 122);
+			var isDigit = code >= 48 && code <= 57;
+			if (isAlpha || isDigit || code == 95) buf.addChar(code);
+			else buf.addChar(95);
+		}
+		var result = buf.toString();
+		if (result == "") return "";
+		var first = result.charCodeAt(0);
+		if (first != null && first >= 48 && first <= 57) return "_" + result;
+		return result;
+	}
+
+	function triviaIndent(trivia:Array<Trivia>):String {
+		var result = "";
+		var hadOnlyWhitespace = true;
+		for (item in trivia) {
+			switch item.kind {
+				case TrBlockComment | TrLineComment:
+					result = "";
+					hadOnlyWhitespace = false;
+				case TrNewline:
+					result = "";
+					hadOnlyWhitespace = true;
+				case TrWhitespace:
+					result += item.text;
+			}
+		}
+		return if (hadOnlyWhitespace) result else "";
+	}
+
+	function normalizeStaticInitLead(trivia:Array<Trivia>, needsNewline:Bool, innerIndent:String):Array<Trivia> {
+		var i = 0;
+		while (i < trivia.length && (trivia[i].kind == TrWhitespace || trivia[i].kind == TrNewline)) {
+			i++;
+		}
+		var trimmed = trivia.slice(i);
+		var prefix:Array<Trivia> = [];
+		if (needsNewline) {
+			prefix.push(new Trivia(TrNewline, "\n"));
+		}
+		if (innerIndent != "") {
+			prefix.push(new Trivia(TrWhitespace, innerIndent));
+		}
+		return prefix.concat(trimmed);
+	}
+
+	function stripTrailingIndentAfterNewline(trivia:Array<Trivia>):Array<Trivia> {
+		var result = trivia.copy();
+		var i = result.length - 1;
+		while (i >= 0 && result[i].kind == TrWhitespace) {
+			result.pop();
+			i--;
+		}
+		return result;
+	}
+
+	function triviaEndsWithNewline(trivia:Array<Trivia>):Bool {
+		var i = trivia.length - 1;
+		while (i >= 0) {
+			switch trivia[i].kind {
+				case TrWhitespace:
+					i--;
+				case TrNewline:
+					return true;
+				case _:
+					return false;
+			}
+		}
+		return false;
 	}
 
 	function printCondCompBegin(e:TCondCompBegin) {

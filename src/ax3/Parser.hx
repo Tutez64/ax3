@@ -302,7 +302,8 @@ class Parser {
 					}
 
 					var token = scanner.consume();
-					switch scanner.advance().kind {
+					var next = scanner.advance();
+					switch next.kind {
 						case TkColonColon:
 							var ns = token;
 							var sep = scanner.consume();
@@ -312,7 +313,22 @@ class Parser {
 							var closeBrace = expectKind(TkBraceClose);
 							var condComp = {ns: ns, sep: sep, name: name};
 							return MCondComp(condComp, openBrace, members, closeBrace);
+						case TkIdent if (next.text == "public" || next.text == "private" || next.text == "protected"
+							|| next.text == "internal" || next.text == "override" || next.text == "static"
+							|| next.text == "final" || next.text == "var" || next.text == "const"
+							|| next.text == "function"):
+							if (namespace != null)
+								throw "Namespace already defined";
+							namespace = token;
+							knownNamespaces.set(token.text, true);
 						case _:
+							if (modifiers.length == 0 && metadata.length == 0 && namespace == null && !namespaceSetted) {
+								var expr = parseIdent(token, true);
+								var blockExpr = parseBlockExprNext(expr);
+								var openBrace = new Token(-1, TkBraceOpen, "{", [], []);
+								var closeBrace = new Token(-1, TkBraceClose, "}", [], []);
+								return MStaticInit({openBrace: openBrace, exprs: [blockExpr], closeBrace: closeBrace});
+							}
 							if (namespace != null)
 								throw "Namespace already defined";
 							namespace = token;

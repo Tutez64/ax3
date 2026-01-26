@@ -214,9 +214,11 @@ class Typer {
 						case MField(f):
 							tMembers.push(TMField(typeClassField(mod, f, typerContext)));
 						case MStaticInit(block):
+							var initHolder = {expr: mk(TELiteral(TLNull(Token.nullToken)), TTVoid, TTVoid)};
+							tMembers.push(TMStaticInit(initHolder));
 							exprTypings.push(function() {
 								var expr = mk(TEBlock(new ExprTyper(context, tree, typerContext).typeBlock(block)), TTVoid, TTVoid);
-								tMembers.push(TMStaticInit({expr: expr}));
+								initHolder.expr = expr;
 							});
 					}
 				}
