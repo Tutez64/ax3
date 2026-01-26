@@ -100,7 +100,7 @@ abstract XML(XMLImpl) from XMLImpl to XMLImpl {
 	#if !flash
 	static function fillDescendants(x:StdXml, name:String, acc:Array<XML>) {
 		for (child in x.elements()) {
-			if (child.nodeName == name) {
+			if (name == "*" || child.nodeName == name) {
 				acc.push(child);
 			}
 			fillDescendants(child, name, acc);

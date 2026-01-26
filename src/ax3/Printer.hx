@@ -370,6 +370,12 @@ class Printer extends PrinterBase {
 				printExpr(e);
 				printTextWithTrivia("..", dotDot);
 				printIdent(childName);
+			case EXmlFilter(e, dot, openParen, cond, closeParen):
+				printExpr(e);
+				printDot(dot);
+				printTextWithTrivia("(", openParen);
+				printExpr(cond);
+				printTextWithTrivia(")", closeParen);
 			case EBlock(b):
 				printBracedExprBlock(b);
 			case EObjectDecl(openBrace, fields, closeBrace):

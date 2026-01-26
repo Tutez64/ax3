@@ -7,6 +7,7 @@ class Parser {
 	var scanner:Scanner;
 	var path:String;
 	var knownNamespaces = new Map<String, Bool>();
+	var xmlFilterDepth:Int = 0;
 
 	public function new(scanner, path) {
 		this.scanner = scanner;
@@ -540,6 +541,17 @@ class Parser {
 	function parseOptionalExpr(allowComma:Bool):Null<Expr> {
 		var token = scanner.advanceExprStart();
 		switch token.kind {
+			case TkAt if (xmlFilterDepth > 0):
+				var at = scanner.consume();
+				switch scanner.advance().kind {
+					case TkIdent:
+						var name = scanner.consume();
+						var dot = new Token(at.pos, TkDot, ".", [], []);
+						var xmlIdent = new Token(at.pos, TkIdent, "__xml", [], []);
+						return parseExprNext(EXmlAttr(EIdent(xmlIdent), dot, at, name), allowComma);
+					case _:
+						throw "Invalid @ syntax: @field expected";
+				}
 			case TkIdent:
 				if (token.text ==  "case" || token.text == "default") // not part of expression, so don't even consume the token
 					return null;
@@ -997,6 +1009,13 @@ class Parser {
 			case TkDot:
 				var dot = scanner.consume();
 				switch scanner.advance().kind {
+					case TkParenOpen:
+						var openParen = scanner.consume();
+						xmlFilterDepth++;
+						var cond = parseExpr(true);
+						xmlFilterDepth--;
+						var closeParen = expectKind(TkParenClose);
+						return parseExprNext(EXmlFilter(first, dot, openParen, cond, closeParen), allowComma);
 					case TkAt:
 						var at = scanner.consume();
 						switch scanner.advance().kind {
@@ -1026,7 +1045,14 @@ class Parser {
 						throw "Invalid dot access expression: fieldName or @fieldName expected";
 				}
 			case TkDotDot:
-				return parseExprNext(EXmlDescend(first, scanner.consume(), expectKind(TkIdent)), allowComma);
+				var dotDot = scanner.consume();
+				var nameToken = switch scanner.advance().kind {
+					case TkIdent | TkAsterisk:
+						scanner.consume();
+					case _:
+						throw "Expected token: TkIdent";
+				}
+				return parseExprNext(EXmlDescend(first, dotDot, nameToken), allowComma);
 			case TkPlus:
 				return parseBinop(first, OpAdd, allowComma);
 			case TkPlusEquals:

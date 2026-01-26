@@ -14,8 +14,6 @@ using StringTools;
 class GenHaxe extends PrinterBase {
 
 	static var REPLACE_CONTROL_CHAR: Map<String, Int> = [
-		"\\b" => 0x08,
-		"\\f" => 0x0C,
 		"\\u00A0" => 160, // non breaking space
 		"\\u2028" => 8232, // line seperator
 		"\\u2029" => 8233, // paragraph seperator
@@ -1478,15 +1476,87 @@ class GenHaxe extends PrinterBase {
 	}
 
 	static function replaceControlChars(s: String, kind: TokenKind): String {
-		var r: Null<Int> = REPLACE_CONTROL_CHAR[s.substr(1, s.length - 2)];
-		return if (r != null) 'String.fromCharCode($r)'
-		else switch kind {
+		var inner = s.substr(1, s.length - 2);
+		var r: Null<Int> = REPLACE_CONTROL_CHAR[inner];
+		if (r != null) {
+			return 'String.fromCharCode($r)';
+		}
+
+		var replacements = findControlCharReplacements(inner);
+		if (replacements.length == 0) {
+			return s;
+		}
+
+		return switch kind {
 		case TkStringDouble:
-			replaces(s, [for (k in REPLACE_CONTROL_CHAR.keys()) k => '" + String.fromCharCode(' + REPLACE_CONTROL_CHAR[k] + ') + "']);
+			buildConcatString(inner, replacements);
 		case TkStringSingle:
-			replaces(s, [for (k in REPLACE_CONTROL_CHAR.keys()) k => "${String.fromCharCode(" + REPLACE_CONTROL_CHAR[k] + ")}"]);
+			buildInterpolatedString(inner, replacements);
 		case _: s;
 		}
+	}
+
+	static function findControlCharReplacements(inner:String):Array<{start:Int, len:Int, code:Int}> {
+		var out:Array<{start:Int, len:Int, code:Int}> = [];
+		var i = 0;
+		while (i < inner.length) {
+			var ch = inner.charAt(i);
+			if (ch == "\\") {
+				if (i + 1 >= inner.length) {
+					i++;
+					continue;
+				}
+				var next = inner.charAt(i + 1);
+				if (next == "u" && i + 5 < inner.length) {
+					var seq = inner.substr(i, 6);
+					var code = REPLACE_CONTROL_CHAR[seq];
+					if (code != null) {
+						out.push({start: i, len: 6, code: code});
+						i += 6;
+						continue;
+					}
+					i += 6;
+					continue;
+				}
+				// Skip escaped character so we don't match control sequences inside \\b, \\uXXXX, etc.
+				i += 2;
+			} else {
+				i++;
+			}
+		}
+		return out;
+	}
+
+	static function buildConcatString(inner:String, replacements:Array<{start:Int, len:Int, code:Int}>):String {
+		var buf = new StringBuf();
+		var segmentStart = 0;
+		for (r in replacements) {
+			buf.add('"');
+			buf.add(inner.substr(segmentStart, r.start - segmentStart));
+			buf.add('" + String.fromCharCode(');
+			buf.add(Std.string(r.code));
+			buf.add(') + "');
+			segmentStart = r.start + r.len;
+		}
+		buf.add(inner.substr(segmentStart));
+		buf.add('"');
+		return buf.toString();
+	}
+
+	static function buildInterpolatedString(inner:String, replacements:Array<{start:Int, len:Int, code:Int}>):String {
+		var buf = new StringBuf();
+		var segmentStart = 0;
+		buf.add("'");
+		for (r in replacements) {
+			buf.add(inner.substr(segmentStart, r.start - segmentStart));
+			buf.add("${String.fromCharCode(");
+			buf.add(Std.string(r.code));
+			buf.add(")}");
+			segmentStart = r.start + r.len;
+		}
+		buf.add(inner.substr(segmentStart));
+		buf.add("'");
+		return buf.toString();
 	}
 
 	static function replaces(s: String, m: Map<String, String>): String {

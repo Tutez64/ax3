@@ -115,6 +115,38 @@ class ASCompat {
 		return (cast n).toString(radix);
 	}
 
+	public static inline function xmlToList(xml:compat.XML):compat.XMLList {
+		#if flash
+		var out:flash.xml.XMLList = new flash.xml.XMLList();
+		if (xml != null) {
+			untyped out[untyped out.length()] = xml;
+		}
+		return out;
+		#else
+		return if (xml == null) [] else [xml];
+		#end
+	}
+
+	public static inline function filterXmlList(list:compat.XMLList, predicate:compat.XML->Bool):compat.XMLList {
+		#if flash
+		var out:flash.xml.XMLList = new flash.xml.XMLList();
+		for (x in list) {
+			if (predicate(x)) {
+				untyped out[untyped out.length()] = x;
+			}
+		}
+		return out;
+		#else
+		var out:Array<compat.XML> = [];
+		for (x in list) {
+			if (predicate(x)) {
+				out.push(x);
+			}
+		}
+		return out;
+		#end
+	}
+
 	// TODO: this is temporary
 	public static inline function thisOrDefault<T>(value:T, def:T):T {
 		return if ((value : ASAny)) value else def;

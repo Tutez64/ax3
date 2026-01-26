@@ -4,11 +4,13 @@ import ax3.ParseTree;
 import ax3.ParseTree.*;
 import ax3.TypedTree;
 import ax3.TypedTreeTools.mk;
+import ax3.TypedTreeTools.mkBuiltin;
 import ax3.TypedTreeTools.mkDeclRef;
 import ax3.TypedTreeTools.skipParens;
 import ax3.TypedTreeTools.tUntypedArray;
 import ax3.TypedTreeTools.tUntypedObject;
 import ax3.TypedTreeTools.tUntypedDictionary;
+import ax3.TypedTreeTools.removeLeadingTrivia;
 import ax3.TypedTreeTools.getConstructor;
 import ax3.TypedTreeTools.isFieldStatic;
 import ax3.TypedTreeTools.getFunctionTypeFromSignature;
@@ -32,6 +34,8 @@ class ExprTyper {
 	final tree:TypedTree;
 	var locals:Locals;
 	var currentReturnType:TType;
+	var xmlFilterVar:Null<TVar>;
+	var xmlFilterToken:Null<Token>;
 
 	public function new(context, tree, typerContext) {
 		this.context = context;
@@ -39,6 +43,8 @@ class ExprTyper {
 		this.typerContext = typerContext;
 		locals = new Map();
 		localsStack = [locals];
+		xmlFilterVar = null;
+		xmlFilterToken = null;
 	}
 
 	inline function err(msg, pos) typerContext.reportError(msg, pos);
@@ -264,6 +270,7 @@ class ExprTyper {
 			case EXmlAttr(e, dot, at, attrName): typeXmlAttr(e, dot, at, attrName, expectedType);
 			case EXmlAttrExpr(e, dot, at, openBracket, eattr, closeBracket): typeXmlAttrExpr(e, dot, at, openBracket, eattr, closeBracket, expectedType);
 			case EXmlDescend(e, dotDot, childName): typeXmlDescend(e, dotDot, childName, expectedType);
+			case EXmlFilter(e, dot, openParen, cond, closeParen): typeXmlFilter(e, dot, openParen, cond, closeParen, expectedType);
 			case ECondCompValue(v): mk(TECondCompValue(typeCondCompVar(v)), TTAny, expectedType);
 			case ECondCompBlock(v, b): typeCondCompBlock(v, b, expectedType);
 			case EUseNamespace(ns): mk(TEUseNamespace(ns), TTVoid, expectedType);
@@ -365,6 +372,11 @@ class ExprTyper {
 
 	function typeIdent(i:Token, e:Expr, expectedType:TType):TExpr {
 		var e = tryTypeIdent(i, expectedType);
+		if (e == null && xmlFilterVar != null && xmlFilterToken != null) {
+			var xmlToken = xmlFilterToken.clone();
+			var xmlExpr = mk(TELocal(xmlToken, xmlFilterVar), TTXML, TTXML);
+			return getTypedField(xmlExpr, TokenTools.mkDot(), i, expectedType);
+		}
 		if (e == null) throwErr('Unknown ident: ${i.text}', i.pos);
 		return e;
 	}
@@ -662,7 +674,7 @@ class ExprTyper {
 		var fieldType = switch field.text {
 			case "addNamespace": TTFun([tUntypedObject], TTXML);
 			case "appendChild": TTFun([tUntypedObject], TTXML);
-			case "attribute": TTFun([TTAny], TTXMLList);
+			case "attribute": TTFun([TTAny], TTString);
 			case "attributes": TTFun([], TTXMLList);
 			case "child": TTFun([tUntypedObject], TTXMLList);
 			case "childIndex": TTFun([], TTInt);
@@ -1533,6 +1545,76 @@ class ExprTyper {
 			syntax: {dotDot: dotDot, name: childName},
 			eobj: e,
 			name: childName.text
+		}), TTXMLList, expectedType);
+	}
+
+	function typeXmlFilter(e:Expr, dot:Token, openParen:Token, cond:Expr, closeParen:Token, expectedType:TType):TExpr {
+		var eobj = typeExpr(e, TTAny);
+		switch eobj.type {
+			case TTXML | TTXMLList:
+			case _:
+				throwErr('E4X filter used on non-XML expression (type: ${eobj.type})', exprPos(e));
+		}
+
+		var prevFilterVar = xmlFilterVar;
+		var prevFilterToken = xmlFilterToken;
+		pushLocals();
+		var xmlToken = TokenTools.mkIdent("__xml");
+		var xmlVar = addLocal("__xml", TTXML);
+		xmlFilterVar = xmlVar;
+		xmlFilterToken = xmlToken;
+		var condExpr = typeExpr(cond, TTBoolean);
+		popLocals();
+		xmlFilterVar = prevFilterVar;
+		xmlFilterToken = prevFilterToken;
+
+		var arg: TFunctionArg = {
+			syntax: {name: xmlToken},
+			name: "__xml",
+			type: TTXML,
+			v: xmlVar,
+			kind: TArgNormal(null, null),
+			comma: null
+		};
+		var sig: TFunctionSignature = {
+			syntax: {openParen: TokenTools.mkOpenParen(), closeParen: TokenTools.mkCloseParen()},
+			args: [arg],
+			ret: {syntax: null, type: TTBoolean}
+		};
+		var returnToken = TokenTools.addTrailingWhitespace(TokenTools.mkIdent("return"));
+		var returnExpr = mk(TEReturn(returnToken, condExpr), TTVoid, TTVoid);
+		var block: TBlock = {
+			syntax: {openBrace: TokenTools.mkOpenBrace(), closeBrace: TokenTools.mkCloseBrace()},
+			exprs: [{expr: returnExpr, semicolon: null}]
+		};
+		var funcExpr = mk(TELocalFunction({
+			syntax: {keyword: TokenTools.mkIdent("function")},
+			name: null,
+			fun: {sig: sig, expr: mk(TEBlock(block), TTVoid, TTVoid)}
+		}), TTFun([TTXML], TTBoolean), TTFun([TTXML], TTBoolean));
+
+		openParen.leadTrivia = dot.leadTrivia.concat(dot.trailTrivia).concat(openParen.leadTrivia);
+
+		var eobjForFilter = eobj;
+		if (eobj.type == TTXML) {
+			var tXmlToList = TTFun([TTXML], TTXMLList);
+			var eWrap = mkBuiltin("ASCompat.xmlToList", tXmlToList, removeLeadingTrivia(eobj));
+			eobjForFilter = mk(TECall(eWrap, {
+				openParen: TokenTools.mkOpenParen(),
+				args: [{expr: eobj, comma: null}],
+				closeParen: TokenTools.mkCloseParen()
+			}), TTXMLList, TTXMLList);
+		}
+
+		var tFilterMethod = TTFun([TTXMLList, TTFun([TTXML], TTBoolean)], TTXMLList);
+		var eFilter = mkBuiltin("ASCompat.filterXmlList", tFilterMethod, removeLeadingTrivia(eobjForFilter));
+		return mk(TECall(eFilter, {
+			openParen: openParen,
+			args: [
+				{expr: eobjForFilter, comma: TokenTools.commaWithSpace},
+				{expr: funcExpr, comma: null}
+			],
+			closeParen: closeParen
 		}), TTXMLList, expectedType);
 	}
 

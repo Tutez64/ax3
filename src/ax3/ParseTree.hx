@@ -47,7 +47,7 @@ class ParseTree {
 	public static function exprPos(e:Expr):Int {
 		return switch (e) {
 			case EIdent(t) | ELiteral(LString(t) | LDecInt(t) | LHexInt(t) | LFloat(t) | LRegExp(t)): t.pos;
-			case ECall(e, _) | EArrayAccess(e, _, _, _) | EField(e, _, _)  | EXmlAttr(e, _, _, _) | EXmlAttrExpr(e, _, _, _, _, _) | EXmlDescend(e, _, _): exprPos(e);
+			case ECall(e, _) | EArrayAccess(e, _, _, _) | EField(e, _, _)  | EXmlAttr(e, _, _, _) | EXmlAttrExpr(e, _, _, _, _, _) | EXmlDescend(e, _, _) | EXmlFilter(e, _, _, _, _): exprPos(e);
 			case ETry(keyword, _) | EFunction(keyword, _) | EIf(keyword, _, _, _, _, _) | ESwitch(keyword, _) | EReturn(keyword, _) | EThrow(keyword, _) | EDelete(keyword, _) | EBreak(keyword) | EContinue(keyword) | ENew(keyword, _, _) | ETypeof(keyword, _) | EVectorDecl(keyword, _, _): keyword.pos;
 			case EParens(openParen, _, _): openParen.pos;
 			case EArrayDecl(d): d.openBracket.pos;
@@ -419,6 +419,7 @@ enum Expr {
 	EXmlAttr(e:Expr, dot:Token, at:Token, attrName:Token);
 	EXmlAttrExpr(e:Expr, dot:Token, at:Token, openBracket:Token, eattr:Expr, closeBracket:Token);
 	EXmlDescend(e:Expr, dotDot:Token, childName:Token);
+	EXmlFilter(e:Expr, dot:Token, openParen:Token, cond:Expr, closeParen:Token);
 	EBlock(b:BracedExprBlock);
 	EObjectDecl(openBrace:Token, fields:Separated<ObjectField>, closeBrace:Token);
 	EIf(keyword:Token, openParen:Token, econd:Expr, closeParen:Token, ethen:Expr, eelse:Null<{keyword:Token, expr:Expr, semiliconBefore: Bool}>);

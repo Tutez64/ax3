@@ -53,4 +53,17 @@ class TestASCompat extends utest.Test {
 		equals(0, indices[1]);
 		equals(2, indices[2]);
 	}
+
+	function testFilterXmlList() {
+		var x = new compat.XML('<root><a id="1"/><b/><a id="2"/></root>');
+		var list = x.children();
+		var filtered = ASCompat.filterXmlList(list, function(node) return node.name() == "a");
+		equals('<a id="1"/>\n<a id="2"/>', filtered.toXMLString());
+	}
+
+	function testXmlToList() {
+		var x = new compat.XML("<root/>");
+		var list = ASCompat.xmlToList(x);
+		equals("<root/>", list.toXMLString());
+	}
 }
