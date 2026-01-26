@@ -41,10 +41,16 @@ class Token {
 
 	public function trimTrailingWhitespace() {
 		var i = trailTrivia.length - 1;
-		if (trailTrivia[i].kind == TrNewline) {
+		if (i < 0) return;
+		var last = trailTrivia[i];
+		if (last == null) return;
+		if (last.kind == TrNewline) {
 			i--;
+			if (i < 0) return;
+			last = trailTrivia[i];
+			if (last == null) return;
 		}
-		if (trailTrivia[i].kind == TrWhitespace) {
+		if (last.kind == TrWhitespace) {
 			trailTrivia.splice(i, 1);
 		}
 	}
