@@ -7,6 +7,7 @@ class StringApi extends AbstractFilter {
 	static final tMatchMethod = TTFun([TTString], TTArray(TTString));
 	static final tSearchMethod = TTFun([TTString], TTInt);
 	static final tStringToolsReplace = TTFun([TTString, TTString, TTString], TTString);
+	static final tStdString = TTFun([TTAny], TTString);
 
 	override function processExpr(e:TExpr):TExpr {
 		return switch e.kind {
@@ -25,10 +26,11 @@ class StringApi extends AbstractFilter {
 							{expr: eString, comma: ePattern.comma}, eBy
 						])));
 
-					case [ePattern = {expr: {type: TTString}}, eBy = {expr: {type: TTString}}]:
+					case [ePattern = {expr: {type: TTString}}, eBy = {expr: {type: TTString | TTAny | TTObject(_) | TTInt | TTUint | TTNumber | TTBoolean}}]:
 						var eStringToolsReplace = mkBuiltin("StringTools.replace", tStringToolsReplace, removeLeadingTrivia(eString));
+						var eReplaceBy = coerceToString(eBy.expr);
 						e.with(kind = TECall(eStringToolsReplace, args.with(args = [
-							{expr: eString, comma: commaWithSpace}, ePattern, eBy
+							{expr: eString, comma: commaWithSpace}, ePattern, {expr: eReplaceBy, comma: eBy.comma}
 						])));
 
 					case _:
@@ -134,5 +136,21 @@ class StringApi extends AbstractFilter {
 			case _:
 				mapExpr(processExpr, e);
 		}
+	}
+
+	function coerceToString(e:TExpr):TExpr {
+		if (e.type == TTString) {
+			return e.with(expectedType = TTString);
+		}
+		var eStdString = mkBuiltin("Std.string", tStdString, removeLeadingTrivia(e));
+		return e.with(
+			kind = TECall(eStdString, {
+				openParen: mkOpenParen(),
+				args: [{expr: e, comma: null}],
+				closeParen: mkCloseParen(removeTrailingTrivia(e))
+			}),
+			type = TTString,
+			expectedType = TTString
+		);
 	}
 }
