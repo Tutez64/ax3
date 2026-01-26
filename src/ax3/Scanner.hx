@@ -239,6 +239,8 @@ class Scanner {
 						pos++;
 						scanFloatAfterDot();
 						return mk(TkFloat);
+					} else if (scanExponent()) {
+						return mk(TkFloat);
 					} else {
 						return mk(TkDecimalInteger);
 					}
@@ -511,6 +513,11 @@ class Scanner {
 				return TkFloat;
 			}
 
+			if (ch == "e".code || ch == "E".code) {
+				scanExponent();
+				return TkFloat;
+			}
+
 			if (isDigit(ch)) {
 				throw "octal literals are not supported";
 			}
@@ -536,6 +543,10 @@ class Scanner {
 
 	function scanFloatAfterDot() {
 		scanDigits();
+		scanExponent();
+	}
+
+	function scanExponent():Bool {
 		if (pos < end) {
 			switch text.fastCodeAt(pos) {
 				case "e".code | "E".code:
@@ -558,10 +569,12 @@ class Scanner {
 
 					pos++;
 					scanDigits();
+					return true;
 
 				case _:
 			}
 		}
+		return false;
 	}
 
 	inline function isDigit(ch) {
