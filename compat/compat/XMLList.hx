@@ -43,6 +43,28 @@ abstract XMLList(XMLListImpl) from XMLListImpl to XMLListImpl {
 		#end
 	}
 
+	public function parent():XML {
+		#if flash
+		return this.parent();
+		#else
+		if (this.length == 0) {
+			return null;
+		}
+		var first:StdXml = this[0];
+		var parent = first.parent;
+		if (parent == null) {
+			return null;
+		}
+		for (i in 1...this.length) {
+			var p = (this[i] : StdXml).parent;
+			if (p != parent) {
+				return null;
+			}
+		}
+		return parent;
+		#end
+	}
+
 	#if flash inline #end
 	public function toXMLString():String {
 		#if flash

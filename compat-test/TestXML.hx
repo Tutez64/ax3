@@ -89,6 +89,13 @@ class TestXML extends utest.Test {
 		equals('<a/>\n<b><c/></b>\n<c/>', x.descendants("*").toXMLString());
 	}
 
+	function testParent() {
+		var x = new compat.XML('<root><child/><child/></root>');
+		var list = x.child("child");
+		equals('<root><child/><child/></root>', list.parent().toXMLString());
+		equals('<root><child/><child/></root>', list[0].parent().toXMLString());
+	}
+
 	function testToString() {
 		// simple
 		var x = new compat.XML("<a>hello</a>");

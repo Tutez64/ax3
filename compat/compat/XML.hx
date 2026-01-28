@@ -71,6 +71,14 @@ abstract XML(XMLImpl) from XMLImpl to XMLImpl {
 		#end
 	}
 
+	public inline function parent():XML {
+		#if flash
+		return this.parent();
+		#else
+		return this.parent;
+		#end
+	}
+
 	public function localName():String {
 		#if flash
 		return this.localName();

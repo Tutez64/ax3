@@ -683,6 +683,7 @@ class ExprTyper {
 			case "namespace": TTFun([], TTAny);
 			case "comments": TTFun([], TTXMLList);
 			case "contains": TTFun([TTXML], TTBoolean);
+			case "parent": TTFun([], TTXML);
 			case "name": TTFun([], TTString);
 			case "localName": TTFun([], TTString);
 			case "copy": TTFun([], TTXML);
@@ -704,6 +705,7 @@ class ExprTyper {
 		var fieldType = switch field.text {
 			case "attribute": TTFun([], TTString);
 			case "length": TTFun([], TTInt);
+			case "parent": TTFun([], TTXML);
 			case "toXMLString": TTFun([], TTString);
 			case _: null;
 		}
