@@ -405,6 +405,7 @@ class ExprTyper {
 					mk(TELiteral(TLSuper(i)), TTInst(superClass), expectedType);
 				}
 			case "true" | "false": mk(TELiteral(TLBool(i)), TTBoolean, expectedType);
+			case "AS3": mk(TELiteral(TLNull(i)), TTAny, expectedType);
 			case "null": mk(TELiteral(TLNull(i)), TTAny, expectedType);
 			case "undefined": mk(TELiteral(TLUndefined(i)), TTAny, expectedType);
 			case "arguments": mk(TEBuiltin(i, "arguments"), TTBuiltin, expectedType);

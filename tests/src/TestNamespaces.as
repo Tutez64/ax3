@@ -1,7 +1,9 @@
 /**
  * Test case: namespace-qualified access and namespace modifiers.
- * `use namespace` at class scope should allow `ns::field` and `obj.ns::field`.
+ * `use namespace` at class scope should allow `ns::field`, `obj.ns::field`,
+ * and dynamic access like `obj.ns::[name]`.
  * Members declared with a namespace modifier should be parsed and preserved.
+ * AS3 should become null.
  */
 package {
     public class TestNamespaces {
@@ -16,9 +18,15 @@ package {
             var c:int = testns::nsMethod();
             var d:int = this.testns::nsMethod();
 
+            var nsList:Array = [AS3];
+            var ns:* = AS3;
+
             var other:NamespaceOther = new NamespaceOther();
             var e:int = other.testns::otherValue;
             var f:int = other.testns::otherMethod();
+            var fieldName:String = "otherValue";
+            var otherDyn:Object = other;
+            var g:* = otherDyn.testns::[fieldName];
         }
     }
 }

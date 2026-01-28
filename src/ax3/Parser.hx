@@ -1030,14 +1030,32 @@ class Parser {
 						var nameToken = scanner.consume();
 						if (scanner.advance().kind == TkColonColon) {
 							var sep = scanner.consume();
-							var fieldToken = expectKind(TkIdent);
-							dot.trailTrivia = dot.trailTrivia
-								.concat(nameToken.leadTrivia)
-								.concat(nameToken.trailTrivia)
-								.concat(sep.leadTrivia)
-								.concat(sep.trailTrivia)
-								.concat([new Trivia(TrBlockComment, "/*" + nameToken.text + "::*/")]);
-							return parseExprNext(EField(first, dot, fieldToken), allowComma);
+							switch scanner.advance().kind {
+								case TkIdent:
+									var fieldToken = scanner.consume();
+									dot.trailTrivia = dot.trailTrivia
+										.concat(nameToken.leadTrivia)
+										.concat(nameToken.trailTrivia)
+										.concat(sep.leadTrivia)
+										.concat(sep.trailTrivia)
+										.concat([new Trivia(TrBlockComment, "/*" + nameToken.text + "::*/")]);
+									return parseExprNext(EField(first, dot, fieldToken), allowComma);
+								case TkBracketOpen:
+									var openBracket = scanner.consume();
+									openBracket.leadTrivia = dot.leadTrivia
+										.concat(dot.trailTrivia)
+										.concat(nameToken.leadTrivia)
+										.concat(nameToken.trailTrivia)
+										.concat(sep.leadTrivia)
+										.concat(sep.trailTrivia)
+										.concat([new Trivia(TrBlockComment, "/*" + nameToken.text + "::*/")])
+										.concat(openBracket.leadTrivia);
+									var eindex = parseExpr(true);
+									var closeBracket = expectKind(TkBracketClose);
+									return parseExprNext(EArrayAccess(first, openBracket, eindex, closeBracket), allowComma);
+								case _:
+									throw "Invalid namespace access: fieldName or [expr] expected";
+							}
 						} else {
 							return parseExprNext(EField(first, dot, nameToken), allowComma);
 						}
