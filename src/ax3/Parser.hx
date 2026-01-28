@@ -1335,25 +1335,51 @@ class Parser {
 
 	function parseInterfaceFunNext(metadata:Array<Metadata>, keyword:Token):InterfaceField {
 		var kind;
+		var signature:Null<FunctionSignature> = null;
 		var nameToken = expectKind(TkIdent);
 		switch nameToken.text {
 			case type = "get" | "set" if (scanner.advance().kind == TkIdent):
 				var name = scanner.consume();
-				var signature = parseFunctionSignature();
+				signature = parseFunctionSignature();
 				kind =
 					if (type == "get") IFGetter(keyword, nameToken, name, signature)
 					else IFSetter(keyword, nameToken, name, signature);
 			case _:
-				kind = IFFun(keyword, nameToken, parseFunctionSignature());
+				signature = parseFunctionSignature();
+				kind = IFFun(keyword, nameToken, signature);
 		}
 
-		var semicolon = expectKind(TkSemicolon);
+		var semicolon = switch scanner.advance().kind {
+			case TkSemicolon:
+				scanner.consume();
+			case TkBraceClose | TkIdent | TkBracketOpen:
+				var trail = if (signature == null) [] else takeSignatureTrailingTrivia(signature);
+				new Token(-1, TkSemicolon, ";", [], trail);
+			case _:
+				expectKind(TkSemicolon);
+		}
 
 		return {
 			metadata: metadata,
 			kind: kind,
 			semicolon: semicolon
 		};
+	}
+
+	function takeSignatureTrailingTrivia(sig:FunctionSignature):Array<Trivia> {
+		var token = if (sig.ret != null) getSyntaxTypeTrailingToken(sig.ret.type) else sig.closeParen;
+		var trail = token.trailTrivia;
+		token.trailTrivia = [];
+		return trail;
+	}
+
+	function getSyntaxTypeTrailingToken(t:SyntaxType):Token {
+		return switch t {
+			case TAny(star): star;
+			case TPath(path):
+				if (path.rest.length == 0) path.first else path.rest[path.rest.length - 1].element;
+			case TVector(v): v.t.gt;
+		}
 	}
 
 	function parseSequence<T>(parse:Void->Null<T>):Array<T> {
