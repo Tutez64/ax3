@@ -73,7 +73,11 @@ class Main {
 				var gen = new ax3.GenHaxe(ctx);
 				gen.writeModule(mod);
 				var out = gen.toString();
-				var path = dir + "/" + mod.name + ".hx";
+				var moduleName = switch mod.pack.decl.kind {
+					case TDClassOrInterface(c): Utils.normalizeTypeName(c.name);
+					case _: mod.name;
+				}
+				var path = dir + "/" + moduleName + ".hx";
 				File.saveContent(path, out);
 			}
 		}

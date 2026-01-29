@@ -39,6 +39,12 @@ class Utils {
 		return part.charAt(0).toLowerCase() + part.substring(1);
 	}
 
+	public static inline function normalizeTypeName(name:String):String {
+		if (name.length == 0) return name;
+		var first = name.charAt(0);
+		return if (first >= "a" && first <= "z") first.toUpperCase() + name.substring(1) else name;
+	}
+
 	public static function normalizePackageName(packName:String):String {
 		if (packName == "") return packName;
 		var parts = packName.split(".");

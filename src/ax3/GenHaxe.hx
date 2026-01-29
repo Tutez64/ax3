@@ -11,6 +11,18 @@ import ax3.TypedTreeTools.typeEq;
 import ax3.Utils;
 using StringTools;
 
+enum DotPathLastKind {
+	LastKeep;
+	LastPackage;
+	LastType;
+}
+
+enum DotPathFirstKind {
+	FirstKeep;
+	FirstPackage;
+	FirstType;
+}
+
 @:nullSafety
 class GenHaxe extends PrinterBase {
 
@@ -50,16 +62,38 @@ class GenHaxe extends PrinterBase {
 		return Utils.normalizePackagePart(part);
 	}
 
-	function printDotPathNormalized(path:DotPath, normalizeLast:Bool, ?preserveGlobalsFirst:Bool) {
-		var keepGlobalsFirst = preserveGlobalsFirst == true && path.first.text == "Globals";
+	inline function normalizeTypeName(name:String):String {
+		return Utils.normalizeTypeName(name);
+	}
+
+	function printDotPathNormalized(path:DotPath, lastKind:DotPathLastKind, ?firstKind:DotPathFirstKind) {
+		var effectiveFirstKind = firstKind == null ? FirstPackage : firstKind;
 		var lastIndex = path.rest.length;
 		var index = 0;
-		var firstText = if (keepGlobalsFirst) path.first.text else if (normalizeLast || index < lastIndex) normalizePackagePart(path.first.text) else path.first.text;
+		inline function normalizePart(text:String, isFirst:Bool, isLast:Bool):String {
+			if (!isLast) {
+				return if (isFirst) {
+					switch effectiveFirstKind {
+						case FirstPackage: normalizePackagePart(text);
+						case FirstType: normalizeTypeName(text);
+						case FirstKeep: text;
+					}
+				} else {
+					normalizePackagePart(text);
+				}
+			}
+			return switch lastKind {
+				case LastPackage: normalizePackagePart(text);
+				case LastType: normalizeTypeName(text);
+				case LastKeep: text;
+			}
+		}
+		var firstText = normalizePart(path.first.text, index == 0, index == lastIndex);
 		printTextWithTrivia(firstText, path.first);
 		for (item in path.rest) {
 			printDot(item.sep);
 			index++;
-			var text = if (normalizeLast || index < lastIndex) normalizePackagePart(item.element.text) else item.element.text;
+			var text = normalizePart(item.element.text, false, index == lastIndex);
 			printTextWithTrivia(text, item.element);
 		}
 	}
@@ -67,7 +101,7 @@ class GenHaxe extends PrinterBase {
 	function printPackage(p:TPackageDecl) {
 		if (p.syntax.name != null) {
 			printTextWithTrivia("package", p.syntax.keyword);
-			printDotPathNormalized(p.syntax.name, true);
+			printDotPathNormalized(p.syntax.name, LastPackage);
 			buf.add(";");
 		} else {
 			printTokenTrivia(p.syntax.keyword);
@@ -111,15 +145,10 @@ class GenHaxe extends PrinterBase {
 			function printPackagePath(p:TPackage) {
 				printTrivia(dotPath.first.leadTrivia);
 				var parts = p.name.split(".");
-				var preserveGlobals = parts.length > 0 && parts[0] == "Globals";
 				for (part in parts) {
+					if (part == "") continue;
 					// lowercase package first letter for Haxe
-					if (preserveGlobals && part == "Globals") {
-						buf.add(part);
-						preserveGlobals = false;
-					} else {
-						buf.add(normalizePackagePart(part));
-					}
+					buf.add(normalizePackagePart(part));
 					buf.add(".");
 				}
 			}
@@ -133,7 +162,7 @@ class GenHaxe extends PrinterBase {
 					switch d.kind {
 						case TDClassOrInterface(c):
 							printPackagePath(c.parentModule.parentPack);
-							buf.add(c.name);
+							buf.add(normalizeTypeName(c.name));
 						case TDVar(v):
 							printPackagePath(v.parentModule.parentPack);
 							buf.add(v.name);
@@ -144,10 +173,18 @@ class GenHaxe extends PrinterBase {
 							throw "assert";
 					}
 					printDotPathTrailTrivia();
-				case TIAliased(_, as, name):
+				case TIAliased(d, as, name):
 					// this is awkward: the decl is pointing to original flash decl in flash package,
 					// but the syntax path is something we constructed to import from Haxe
-					printDotPathNormalized(i.syntax.path, false, true);
+					var lastKind = switch d.kind {
+						case TDClassOrInterface(_): LastType;
+						case _: LastKeep;
+					}
+					var firstKind = switch d.kind {
+						case TDVar(_) | TDFunction(_): FirstType;
+						case _: FirstPackage;
+					}
+					printDotPathNormalized(i.syntax.path, lastKind, firstKind);
 					printTextWithTrivia("as", as);
 					printTextWithTrivia(name.text, name);
 				case TIAll(pack, _, asterisk):
@@ -199,16 +236,16 @@ class GenHaxe extends PrinterBase {
 		printMetadata(i.metadata);
 		printDeclModifiers(i.modifiers);
 		printTextWithTrivia(if (isPrivate) "private interface" else "interface", i.syntax.keyword);
-		printTextWithTrivia(i.name, i.syntax.name);
+		printTextWithTrivia(normalizeTypeName(i.name), i.syntax.name);
 		if (info.extend != null) {
 			printTextWithTrivia("extends", info.extend.keyword);
-			printDotPathNormalized(info.extend.interfaces[0].iface.syntax, false);
+			printDotPathNormalized(info.extend.interfaces[0].iface.syntax, LastType);
 			for (i in 1...info.extend.interfaces.length) {
 				var prevComma = info.extend.interfaces[i - 1].comma;
 				if (prevComma != null) printTextWithTrivia(" extends ", prevComma); // don't lose comments around comma, if there are any
 				else buf.add(" extends ");
 				var i = info.extend.interfaces[i];
-				printDotPathNormalized(i.iface.syntax, false);
+				printDotPathNormalized(i.iface.syntax, LastType);
 			}
 		}
 		printOpenBrace(i.syntax.openBrace);
@@ -244,20 +281,20 @@ class GenHaxe extends PrinterBase {
 		printMetadata(c.metadata);
 		printDeclModifiers(c.modifiers);
 		printTextWithTrivia(if (isPrivate) "private class" else  "class", c.syntax.keyword);
-		printTextWithTrivia(c.name, c.syntax.name);
+		printTextWithTrivia(normalizeTypeName(c.name), c.syntax.name);
 		if (info.extend != null) {
 			printTextWithTrivia("extends", info.extend.syntax.keyword);
-			printDotPathNormalized(info.extend.syntax.path, false);
+			printDotPathNormalized(info.extend.syntax.path, LastType);
 		}
 		if (info.implement != null) {
 			printTextWithTrivia("implements", info.implement.keyword);
-			printDotPathNormalized(info.implement.interfaces[0].iface.syntax, false);
+			printDotPathNormalized(info.implement.interfaces[0].iface.syntax, LastType);
 			for (i in 1...info.implement.interfaces.length) {
 				var prevComma = info.implement.interfaces[i - 1].comma;
 				if (prevComma != null) printTextWithTrivia(" implements ", prevComma); // don't lose comments around comma, if there are any
 				else buf.add(" implements ");
 				var i = info.implement.interfaces[i];
-				printDotPathNormalized(i.iface.syntax, false);
+				printDotPathNormalized(i.iface.syntax, LastType);
 			}
 		}
 		printOpenBrace(c.syntax.openBrace);
@@ -817,12 +854,13 @@ class GenHaxe extends PrinterBase {
 	}
 
 	inline function getClassLocalPath(cls:TClassOrInterfaceDecl):String {
-		return if (currentModule.isImported(cls)) cls.name else makeFQN(cls);
+		return if (currentModule.isImported(cls)) normalizeTypeName(cls.name) else makeFQN(cls);
 	}
 
 	static function makeFQN(cls:TClassOrInterfaceDecl) {
 		var packName = cls.parentModule == null ? "" : Utils.normalizePackageName(cls.parentModule.parentPack.name);
-		return if (packName == "") cls.name else packName + "." + cls.name;
+		var typeName = Utils.normalizeTypeName(cls.name);
+		return if (packName == "") typeName else packName + "." + typeName;
 	}
 
 	function printTypeRef(t:TTypeRef, printTypeParams:Bool, pos:Int) {
@@ -928,7 +966,12 @@ class GenHaxe extends PrinterBase {
 				buf.add("ASDictionary.type");
 				printTrivia(TypedTreeTools.removeTrailingTrivia(e));
 
-			case TEDeclRef(dotPath, c): printDotPathNormalized(dotPath, false);
+			case TEDeclRef(dotPath, c):
+				var lastKind = switch c.kind {
+					case TDClassOrInterface(_): LastType;
+					case _: LastKeep;
+				};
+				printDotPathNormalized(dotPath, lastKind);
 			case TECall(eobj, args): printExpr(eobj); printCallArgs(args);
 			case TEArrayDecl(d): printArrayDecl(d);
 			case TEVectorDecl(v): throw "assert";
@@ -937,6 +980,7 @@ class GenHaxe extends PrinterBase {
 				var keywordTrail = keyword.removeTrailingTrivia();
 				if (TokenTools.containsOnlyWhitespace(keywordTrail)) keywordTrail = [];
 				var exprLead = TypedTreeTools.removeLeadingTrivia(e);
+				if (TokenTools.containsOnlyWhitespace(exprLead)) exprLead = [];
 				var exprTrail = TypedTreeTools.removeTrailingTrivia(e);
 				printTextWithTrivia("ASCompat.typeof", keyword);
 				buf.add("(");
