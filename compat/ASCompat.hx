@@ -87,6 +87,24 @@ class ASCompat {
 		#end
 	}
 
+	public static inline function typeof(value:Dynamic):String {
+		#if js
+		return js.Syntax.typeof(value);
+		#else
+		if (Std.isOfType(value, String)) {
+			return "string";
+		}
+		return switch (Type.typeof(value)) {
+			case TNull: "object";
+			case TInt | TFloat: "number";
+			case TBool: "boolean";
+			case TObject | TClass(_) | TEnum(_): "object";
+			case TFunction: "function";
+			case TUnknown: "undefined";
+		}
+		#end
+	}
+
 	public static inline function as<T>(v:Dynamic, c:Class<T>):T {
 		return flash.Lib.as(v, c);
 	}

@@ -615,12 +615,23 @@ class Parser {
 		}
 	}
 
+	function makeTypeof(keyword:Token, e:Expr):Expr {
+		return switch e {
+			case EBinop(a, bop, b):
+				EBinop(makeTypeof(keyword, a), bop, b);
+			case ETernary(econd, question, ethen, colon, eelse):
+				ETernary(makeTypeof(keyword, econd), question, ethen, colon, eelse);
+			case _:
+				ETypeof(keyword, e);
+		}
+	}
+
 	function parseIdent(consumedToken:Token, allowComma:Bool):Expr {
 		switch consumedToken.text {
 			case "new":
 				return parseNewNext(consumedToken, allowComma);
 			case "typeof":
-				return ETypeof(consumedToken, parseExpr(allowComma));
+				return makeTypeof(consumedToken, parseExpr(allowComma));
 			case "return":
 				return EReturn(consumedToken, parseOptionalExpr(allowComma));
 			case "throw":

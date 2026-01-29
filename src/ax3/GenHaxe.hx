@@ -933,7 +933,18 @@ class GenHaxe extends PrinterBase {
 			case TEArrayDecl(d): printArrayDecl(d);
 			case TEVectorDecl(v): throw "assert";
 			case TEReturn(keyword, e): printTextWithTrivia("return", keyword); if (e != null) printExpr(e);
-			case TETypeof(keyword, e): printTextWithTrivia("typeof", keyword); printExpr(e);
+			case TETypeof(keyword, e):
+				var keywordTrail = keyword.removeTrailingTrivia();
+				if (TokenTools.containsOnlyWhitespace(keywordTrail)) keywordTrail = [];
+				var exprLead = TypedTreeTools.removeLeadingTrivia(e);
+				var exprTrail = TypedTreeTools.removeTrailingTrivia(e);
+				printTextWithTrivia("ASCompat.typeof", keyword);
+				buf.add("(");
+				printTrivia(keywordTrail);
+				printTrivia(exprLead);
+				printExpr(e);
+				buf.add(")");
+				printTrivia(exprTrail);
 			case TEThrow(keyword, e): printTextWithTrivia("throw", keyword); printExpr(e);
 			case TEDelete(keyword, e): throw "assert";
 			case TEBreak(keyword): printTextWithTrivia("break", keyword);

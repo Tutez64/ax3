@@ -66,4 +66,12 @@ class TestASCompat extends utest.Test {
 		var list = ASCompat.xmlToList(x);
 		equals("<root/>", list.toXMLString());
 	}
+
+	function testTypeof() {
+		equals("function", ASCompat.typeof(function() {}));
+		equals("number", ASCompat.typeof(1));
+		equals("boolean", ASCompat.typeof(true));
+		equals("string", ASCompat.typeof("test"));
+		equals("object", ASCompat.typeof(null));
+	}
 }

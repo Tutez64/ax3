@@ -229,7 +229,7 @@ class ExprTyper {
 
 			case ETypeof(keyword, ex):
 				if (ex == null) throw "assert";
-				mk(TETypeof(keyword, typeExpr(ex, TTAny)), TTVoid, TTVoid);
+				mk(TETypeof(keyword, typeExpr(ex, TTAny)), TTString, expectedType);
 
 			case EThrow(keyword, e):
 				if (expectedType != TTVoid) throw "assert";
