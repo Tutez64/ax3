@@ -26,6 +26,14 @@ package {
 
             var list:XMLList = new XML("<a/><b/>").children();
             delete list[0];
+
+            var dyn:DeleteDynamic = new DeleteDynamic();
+            delete dyn["field"];
         }
+    }
+}
+
+dynamic class DeleteDynamic {
+    public function DeleteDynamic() {
     }
 }

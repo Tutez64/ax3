@@ -78,6 +78,15 @@ class RewriteDelete extends AbstractFilter {
 					args: [{expr: a.eobj, comma: commaWithSpace}, {expr: eindex, comma: null}]
 				}));
 
+			case [TTInst(cls), _] if (isDynamicClass(cls) || isProxyClass(cls)):
+				var eindex = if (a.eindex.type != TTString) a.eindex.with(expectedType = TTString) else a.eindex;
+				var eDeleteField = mkBuiltin("Reflect.deleteField", tDeleteField, deleteKeyword.leadTrivia);
+				eDelete.with(kind = TECall(eDeleteField, {
+					openParen: new Token(0, TkParenOpen, "(", a.syntax.openBracket.leadTrivia, a.syntax.openBracket.trailTrivia),
+					closeParen: new Token(0, TkParenClose, ")", a.syntax.openBracket.leadTrivia, a.syntax.openBracket.trailTrivia),
+					args: [{expr: a.eobj, comma: commaWithSpace}, {expr: eindex, comma: null}]
+				}));
+
 			case [TTXMLList, TTInt | TTUint]:
 				var lead = removeLeadingTrivia(eDelete);
 				var trail = removeTrailingTrivia(eDelete);
@@ -104,6 +113,27 @@ class RewriteDelete extends AbstractFilter {
 
 			case _:
 				throwError(exprPos(a.eindex), 'Unknown `delete` expression: index type = ${a.eindex.type.getName()}, object type = ${a.eobj.type}');
+		}
+	}
+
+	static function isDynamicClass(cls:TClassOrInterfaceDecl):Bool {
+		for (m in cls.modifiers) {
+			switch m {
+				case DMDynamic(_):
+					return true;
+				case _:
+			}
+		}
+		return false;
+	}
+
+	static function isProxyClass(cls:TClassOrInterfaceDecl):Bool {
+		return switch cls.kind {
+			case TClass(info) if (info.extend != null):
+				info.extend.superClass.parentModule.parentPack.name == "flash.utils"
+					&& info.extend.superClass.name == "Proxy";
+			case _:
+				false;
 		}
 	}
 }
