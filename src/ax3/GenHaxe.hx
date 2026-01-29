@@ -8,6 +8,7 @@ import ax3.Token.Trivia;
 import ax3.TypedTreeTools.exprPos;
 import ax3.TypedTreeTools.skipParens;
 import ax3.TypedTreeTools.typeEq;
+import ax3.Utils;
 using StringTools;
 
 @:nullSafety
@@ -45,10 +46,28 @@ class GenHaxe extends PrinterBase {
 		@:nullSafety(Off) currentModule = null;
 	}
 
+	inline function normalizePackagePart(part:String):String {
+		return Utils.normalizePackagePart(part);
+	}
+
+	function printDotPathNormalized(path:DotPath, normalizeLast:Bool, ?preserveGlobalsFirst:Bool) {
+		var keepGlobalsFirst = preserveGlobalsFirst == true && path.first.text == "Globals";
+		var lastIndex = path.rest.length;
+		var index = 0;
+		var firstText = if (keepGlobalsFirst) path.first.text else if (normalizeLast || index < lastIndex) normalizePackagePart(path.first.text) else path.first.text;
+		printTextWithTrivia(firstText, path.first);
+		for (item in path.rest) {
+			printDot(item.sep);
+			index++;
+			var text = if (normalizeLast || index < lastIndex) normalizePackagePart(item.element.text) else item.element.text;
+			printTextWithTrivia(text, item.element);
+		}
+	}
+
 	function printPackage(p:TPackageDecl) {
 		if (p.syntax.name != null) {
 			printTextWithTrivia("package", p.syntax.keyword);
-			printDotPath(p.syntax.name);
+			printDotPathNormalized(p.syntax.name, true);
 			buf.add(";");
 		} else {
 			printTokenTrivia(p.syntax.keyword);
@@ -92,9 +111,15 @@ class GenHaxe extends PrinterBase {
 			function printPackagePath(p:TPackage) {
 				printTrivia(dotPath.first.leadTrivia);
 				var parts = p.name.split(".");
+				var preserveGlobals = parts.length > 0 && parts[0] == "Globals";
 				for (part in parts) {
 					// lowercase package first letter for Haxe
-					buf.add(part.charAt(0).toLowerCase() + part.substring(1));
+					if (preserveGlobals && part == "Globals") {
+						buf.add(part);
+						preserveGlobals = false;
+					} else {
+						buf.add(normalizePackagePart(part));
+					}
 					buf.add(".");
 				}
 			}
@@ -122,7 +147,7 @@ class GenHaxe extends PrinterBase {
 				case TIAliased(_, as, name):
 					// this is awkward: the decl is pointing to original flash decl in flash package,
 					// but the syntax path is something we constructed to import from Haxe
-					printDotPath(i.syntax.path);
+					printDotPathNormalized(i.syntax.path, false, true);
 					printTextWithTrivia("as", as);
 					printTextWithTrivia(name.text, name);
 				case TIAll(pack, _, asterisk):
@@ -177,13 +202,13 @@ class GenHaxe extends PrinterBase {
 		printTextWithTrivia(i.name, i.syntax.name);
 		if (info.extend != null) {
 			printTextWithTrivia("extends", info.extend.keyword);
-			printDotPath(info.extend.interfaces[0].iface.syntax);
+			printDotPathNormalized(info.extend.interfaces[0].iface.syntax, false);
 			for (i in 1...info.extend.interfaces.length) {
 				var prevComma = info.extend.interfaces[i - 1].comma;
 				if (prevComma != null) printTextWithTrivia(" extends ", prevComma); // don't lose comments around comma, if there are any
 				else buf.add(" extends ");
 				var i = info.extend.interfaces[i];
-				printDotPath(i.iface.syntax);
+				printDotPathNormalized(i.iface.syntax, false);
 			}
 		}
 		printOpenBrace(i.syntax.openBrace);
@@ -222,17 +247,17 @@ class GenHaxe extends PrinterBase {
 		printTextWithTrivia(c.name, c.syntax.name);
 		if (info.extend != null) {
 			printTextWithTrivia("extends", info.extend.syntax.keyword);
-			printDotPath(info.extend.syntax.path);
+			printDotPathNormalized(info.extend.syntax.path, false);
 		}
 		if (info.implement != null) {
 			printTextWithTrivia("implements", info.implement.keyword);
-			printDotPath(info.implement.interfaces[0].iface.syntax);
+			printDotPathNormalized(info.implement.interfaces[0].iface.syntax, false);
 			for (i in 1...info.implement.interfaces.length) {
 				var prevComma = info.implement.interfaces[i - 1].comma;
 				if (prevComma != null) printTextWithTrivia(" implements ", prevComma); // don't lose comments around comma, if there are any
 				else buf.add(" implements ");
 				var i = info.implement.interfaces[i];
-				printDotPath(i.iface.syntax);
+				printDotPathNormalized(i.iface.syntax, false);
 			}
 		}
 		printOpenBrace(c.syntax.openBrace);
@@ -796,7 +821,7 @@ class GenHaxe extends PrinterBase {
 	}
 
 	static function makeFQN(cls:TClassOrInterfaceDecl) {
-		var packName = cls.parentModule == null ? "" : cls.parentModule.parentPack.name;
+		var packName = cls.parentModule == null ? "" : Utils.normalizePackageName(cls.parentModule.parentPack.name);
 		return if (packName == "") cls.name else packName + "." + cls.name;
 	}
 
@@ -903,7 +928,7 @@ class GenHaxe extends PrinterBase {
 				buf.add("ASDictionary.type");
 				printTrivia(TypedTreeTools.removeTrailingTrivia(e));
 
-			case TEDeclRef(dotPath, c): printDotPath(dotPath);
+			case TEDeclRef(dotPath, c): printDotPathNormalized(dotPath, false);
 			case TECall(eobj, args): printExpr(eobj); printCallArgs(args);
 			case TEArrayDecl(d): printArrayDecl(d);
 			case TEVectorDecl(v): throw "assert";

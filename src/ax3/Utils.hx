@@ -33,4 +33,18 @@ class Utils {
 			}
 		}
 	}
+
+	public static inline function normalizePackagePart(part:String):String {
+		if (part.length == 0) return part;
+		return part.charAt(0).toLowerCase() + part.substring(1);
+	}
+
+	public static function normalizePackageName(packName:String):String {
+		if (packName == "") return packName;
+		var parts = packName.split(".");
+		for (i in 0...parts.length) {
+			parts[i] = normalizePackagePart(parts[i]);
+		}
+		return parts.join(".");
+	}
 }
