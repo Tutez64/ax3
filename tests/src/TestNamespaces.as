@@ -3,6 +3,7 @@
  * `use namespace` at class scope should allow `ns::field`, `obj.ns::field`,
  * and dynamic access like `obj.ns::[name]`.
  * Members declared with a namespace modifier should be parsed and preserved.
+ * Unary bitwise negation should not merge with namespace comments.
  * AS3 should become null.
  */
 package {
@@ -27,6 +28,8 @@ package {
             var fieldName:String = "otherValue";
             var otherDyn:Object = other;
             var g:* = otherDyn.testns::[fieldName];
+            var h:int = ~testns::nsValue;
+            var i:int = ~this.testns::nsValue;
         }
     }
 }

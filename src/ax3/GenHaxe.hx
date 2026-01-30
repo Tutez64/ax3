@@ -1322,7 +1322,29 @@ class GenHaxe extends PrinterBase {
 			case PreNeg(t): printTextWithTrivia("-", t);
 			case PreIncr(t): printTextWithTrivia("++", t);
 			case PreDecr(t): printTextWithTrivia("--", t);
-			case PreBitNeg(t): printTextWithTrivia("~", t);
+			case PreBitNeg(t):
+				var lead = TypedTreeTools.removeLeadingTrivia(e);
+				var combined = t.trailTrivia.concat(lead);
+				var firstNonWsIndex = -1;
+				for (i in 0...combined.length) {
+					switch combined[i].kind {
+						case TrWhitespace | TrNewline:
+						case _:
+							firstNonWsIndex = i;
+							break;
+					}
+					if (firstNonWsIndex != -1) break;
+				}
+				var needsGuard = firstNonWsIndex == 0 && (combined[0].kind == TrBlockComment || combined[0].kind == TrLineComment);
+				printTrivia(t.leadTrivia);
+				buf.add("~");
+				if (needsGuard) {
+					buf.add(" ");
+				}
+				printTrivia(t.trailTrivia);
+				printTrivia(lead);
+				printExpr(e);
+				return;
 		}
 		printExpr(e);
 	}
