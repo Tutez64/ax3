@@ -96,18 +96,38 @@ abstract ASAny(Dynamic)
 
 	#if flash inline #end
 	public static function getPropertyOrBoundMethod(obj:Any, name:String):ASAny {
-		#if flash
-		return Reflect.getProperty(obj, name);
-		#else
-		var value:Dynamic = Reflect.getProperty(obj, name);
-		if (Reflect.isFunction(value))
-			return value.bind(obj); // TODO: maybe we should (ab)use Haxe/JS $bind here for caching the bound methods?
-		else
-			return value;
-		#end
+		var handled = false;
+		var result:ASAny = null;
+		if (Std.isOfType(obj, ASArrayBase)) {
+			var index = parseArrayIndex(name);
+			if (index != null) {
+				result = (cast obj : ASArrayBase).get(index);
+				handled = true;
+			}
+		}
+		if (!handled) {
+			#if flash
+			result = Reflect.getProperty(obj, name);
+			#else
+			var value:Dynamic = Reflect.getProperty(obj, name);
+			if (Reflect.isFunction(value)) {
+				result = value.bind(obj); // TODO: maybe we should (ab)use Haxe/JS $bind here for caching the bound methods?
+			} else {
+				result = value;
+			}
+			#end
+		}
+		return result;
 	}
 
 	@:op(a.b) function ___set(name:String, value:ASAny):ASAny {
+		if (Std.isOfType(this, ASArrayBase)) {
+			var index = parseArrayIndex(name);
+			if (index != null) {
+				(cast this : ASArrayBase).set(index, value);
+				return value;
+			}
+		}
 		Reflect.setProperty(this, name, value);
 		return value;
 	}
@@ -150,4 +170,21 @@ abstract ASAny(Dynamic)
 
 	@:op([]) inline function ___arrayGet(name:ASAny):ASAny return ___get(name);
 	@:op([]) inline function ___arraySet(name:ASAny, value:ASAny):ASAny return ___set(name, value);
+
+	static function parseArrayIndex(name:String):Null<Int> {
+		var length = name.length;
+		if (length == 0) {
+			return null;
+		}
+		if (length > 1 && name.charCodeAt(0) == 48) {
+			return null;
+		}
+		for (i in 0...length) {
+			var code = name.charCodeAt(i);
+			if (code < 48 || code > 57) {
+				return null;
+			}
+		}
+		return Std.parseInt(name);
+	}
 }

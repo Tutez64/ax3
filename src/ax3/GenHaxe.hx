@@ -284,7 +284,13 @@ class GenHaxe extends PrinterBase {
 		printTextWithTrivia(normalizeTypeName(c.name), c.syntax.name);
 		if (info.extend != null) {
 			printTextWithTrivia("extends", info.extend.syntax.keyword);
-			printDotPathNormalized(info.extend.syntax.path, LastType);
+			if (ParseTree.dotPathToString(info.extend.syntax.path) == "Array") {
+				printTrivia(ParseTree.getDotPathLeadingTrivia(info.extend.syntax.path));
+				buf.add("ASArrayBase");
+				printTrivia(ParseTree.getDotPathTrailingTrivia(info.extend.syntax.path));
+			} else {
+				printDotPathNormalized(info.extend.syntax.path, LastType);
+			}
 		}
 		if (info.implement != null) {
 			printTextWithTrivia("implements", info.implement.keyword);

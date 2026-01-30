@@ -96,6 +96,8 @@ class RestArgs extends AbstractFilter {
 			case TELocalFunction(f):
 				processFunction(f.fun);
 
+			// Haxe < 4.20 needs explicit packing of rest args into an array.
+			#if (haxe_ver < 4.20)
 			case TENew(_, TNType({type: TTInst(cls)}), args) if (args != null && args.args.length > 0):
 				switch getConstructor(cls) {
 					case {type: TTFun(argTypes, _, TRestAs3)}:
@@ -103,11 +105,15 @@ class RestArgs extends AbstractFilter {
 
 					case _:
 				}
+			#end
 
+			// Haxe < 4.20: transform call sites to pass rest args as a single array.
+			#if (haxe_ver < 4.20)
 			case TECall(eobj = {type: TTFun(argTypes, _, TRestAs3)}, args) if (args.args.length > argTypes.length):
 				if (!keepRestCall(eobj)) {
 					args.args = transformArgs(args.args, argTypes.length);
 				}
+			#end
 
 			case _:
 		}
