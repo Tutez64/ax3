@@ -1584,6 +1584,7 @@ class GenHaxe extends PrinterBase {
 	}
 
 	static function replaceControlChars(s: String, kind: TokenKind): String {
+		s = replaceUnsupportedStringEscapes(s);
 		var inner = s.substr(1, s.length - 2);
 		var r: Null<Int> = REPLACE_CONTROL_CHAR[inner];
 		if (r != null) {
@@ -1602,6 +1603,49 @@ class GenHaxe extends PrinterBase {
 			buildInterpolatedString(inner, replacements);
 		case _: s;
 		}
+	}
+
+	static function replaceUnsupportedStringEscapes(s: String): String {
+		if (s.length < 2) {
+			return s;
+		}
+		var quote = s.charAt(0);
+		var inner = s.substr(1, s.length - 2);
+		var buf = new StringBuf();
+		var changed = false;
+		var i = 0;
+		while (i < inner.length) {
+			var ch = inner.charAt(i);
+			if (ch == "\\") {
+				if (i + 1 >= inner.length) {
+					buf.add("\\");
+					i++;
+					continue;
+				}
+				var next = inner.charAt(i + 1);
+				switch (next) {
+					case "b":
+						buf.add("\\x08");
+						changed = true;
+						i += 2;
+					case "f":
+						buf.add("\\x0C");
+						changed = true;
+						i += 2;
+					case _:
+						buf.add("\\");
+						buf.add(next);
+						i += 2;
+				}
+			} else {
+				buf.add(ch);
+				i++;
+			}
+		}
+		if (!changed) {
+			return s;
+		}
+		return quote + buf.toString() + quote;
 	}
 
 	static function findControlCharReplacements(inner:String):Array<{start:Int, len:Int, code:Int}> {
