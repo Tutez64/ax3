@@ -8,6 +8,7 @@ class Filters {
 		var externImports = new ExternModuleLevelImports(context);
 		var coerceToBool = new CoerceToBool(context);
 		var detectFieldRedefinitions = new RewriteRedefinedPrivate.DetectFieldRedefinitions(context);
+		var detectStaticInstanceConflicts = new HandleStaticInstanceConflict.DetectStaticInstanceConflicts(context);
 		// cloneExpr needs coverage both before and after rewrites to hit pre- and post-transform node kinds.
 		var cloneExprSmokeEarly = context.config.testCloneExpr == true ? new CloneExprSmoke(context) : null;
 		var cloneExprSmokeLate = context.config.testCloneExpr == true ? new CloneExprSmoke(context) : null;
@@ -16,7 +17,9 @@ class Filters {
 		if (cloneExprSmokeEarly != null) filters.push(cloneExprSmokeEarly);
 		filters = filters.concat([
 			detectFieldRedefinitions,
+			detectStaticInstanceConflicts,
 			new RewriteRedefinedPrivate.RenameRedefinedFields(context, detectFieldRedefinitions),
+			new HandleStaticInstanceConflict.RenameStaticInstanceConflicts(context, detectStaticInstanceConflicts),
 			new RewriteAssignOps(context),
 			new WrapModuleLevelDecls(context),
 			new HandleVisibilityModifiers(context),
