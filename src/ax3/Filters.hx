@@ -40,6 +40,7 @@ class Filters {
 			new RewriteTypesWithComment(context),
 			new RewriteDelete(context),
 			new RewriteArrayAccess(context),
+			new RewriteDynamicFieldAccess(context),
 			new RewriteAs(context),
 			new RewriteIs(context),
 			new RewriteCFor(context)
