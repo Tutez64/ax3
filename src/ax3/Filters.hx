@@ -39,6 +39,7 @@ class Filters {
 			new RewriteNewArray(context),
 			new RewriteTypesWithComment(context),
 			new RewriteDelete(context),
+			new InferLocalVarTypes(context),
 			new RewriteArrayAccess(context),
 			new RewriteDynamicFieldAccess(context),
 			new RewriteAs(context),
