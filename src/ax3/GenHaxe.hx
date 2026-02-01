@@ -1079,6 +1079,7 @@ class GenHaxe extends PrinterBase {
 			case "parseFloat": "Std.parseFloat";
 			case "NaN": "Math.NaN";
 			case "isNaN": "Math.isNaN";
+			case "isFinite": "Math.isFinite";
 			case "escape": "ASCompat.escape";
 			case "unescape": "ASCompat.unescape";
 			case "arguments": "/*TODO*/arguments";

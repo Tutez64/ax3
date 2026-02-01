@@ -427,6 +427,7 @@ class ExprTyper {
 			case "parseFloat": mk(TEBuiltin(i, "parseFloat"), TTFun([TTString], TTNumber), expectedType);
 			case "NaN": mk(TEBuiltin(i, "NaN"), TTNumber, expectedType);
 			case "isNaN": mk(TEBuiltin(i, "isNaN"), TTFun([TTNumber], TTBoolean), expectedType);
+			case "isFinite": mk(TEBuiltin(i, "isFinite"), TTFun([TTNumber], TTBoolean), expectedType);
 			case "escape": mk(TEBuiltin(i, "escape"), TTFun([TTString], TTString), expectedType);
 			case "unescape": mk(TEBuiltin(i, "unescape"), TTFun([TTString], TTString), expectedType);
 			case ident:
