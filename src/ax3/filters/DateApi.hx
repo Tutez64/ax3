@@ -5,6 +5,58 @@ import ax3.ParseTree.Binop;
 class DateApi extends AbstractFilter {
 	override function processExpr(e:TExpr):TExpr {
 		return switch e.kind {
+			case TECall(eobj = {kind: TEField({kind: TOExplicit(_, eDate = {type: TTInst({name: "Date", parentModule: {parentPack: {name: ""}}})})}, fieldName, fieldToken)}, args):
+				var lead = removeLeadingTrivia(e);
+				var trail = removeTrailingTrivia(e);
+				var dateExpr = processExpr(eDate);
+				if (lead.length == 0) lead = removeLeadingTrivia(dateExpr) else removeLeadingTrivia(dateExpr);
+				removeTrailingTrivia(dateExpr);
+				args = mapCallArgs(processExpr, args);
+				switch fieldName {
+					case "setTime"
+					   | "setFullYear"
+					   | "setMonth"
+					   | "setDate"
+					   | "setHours"
+					   | "setMinutes"
+					   | "setSeconds"
+					   | "setMilliseconds"
+					   | "getMilliseconds"
+					   | "getUTCMilliseconds"
+					   :
+						var eMethod = mkBuiltin("ASCompat.ASDate." + fieldName, TTFunction, lead);
+						var newArgs = if (args == null) {
+							{openParen: mkOpenParen(), args: [{expr: dateExpr, comma: null}], closeParen: mkCloseParen(trail)}
+						} else if (args.args.length == 0) {
+							var updatedArgs = args.with(args = [{expr: dateExpr, comma: null}]);
+							updatedArgs.closeParen.trailTrivia = trail;
+							updatedArgs;
+						} else {
+							var updatedArgs = args.with(args = [{expr: dateExpr, comma: commaWithSpace}].concat(args.args));
+							updatedArgs.closeParen.trailTrivia = trail;
+							updatedArgs;
+						}
+						e.with(kind = TECall(eMethod, newArgs));
+					case _:
+						mapExpr(processExpr, e);
+				}
+
+			case TECall(eobj = {kind: TEField({kind: TOExplicit(_, eDate = {type: TTStatic({name: "Date", parentModule: {parentPack: {name: ""}}})})}, fieldName, fieldToken)}, args) if (fieldName == "UTC"):
+				var lead = removeLeadingTrivia(e);
+				var trail = removeTrailingTrivia(e);
+				var dateExpr = processExpr(eDate);
+				if (lead.length == 0) lead = removeLeadingTrivia(dateExpr) else removeLeadingTrivia(dateExpr);
+				removeTrailingTrivia(dateExpr);
+				args = mapCallArgs(processExpr, args);
+				var eMethod = mkBuiltin("ASCompat.ASDate.UTC", TTFunction, lead);
+				var newArgs = if (args == null) {
+					{openParen: mkOpenParen(), args: [], closeParen: mkCloseParen(trail)};
+				} else {
+					args.closeParen.trailTrivia = trail;
+					args;
+				}
+				e.with(kind = TECall(eMethod, newArgs));
+
 			case TENew(keyword, TNType(ref = {type: TTInst(dateCls = {name: "Date", parentModule: {parentPack: {name: ""}}})}), args):
 				args = mapCallArgs(processExpr, args);
 				switch args {
@@ -57,6 +109,10 @@ class DateApi extends AbstractFilter {
 				}
 
 				eDate = processExpr(eDate);
+				var lead = removeLeadingTrivia(e);
+				var trail = removeTrailingTrivia(e);
+				if (lead.length == 0) lead = removeLeadingTrivia(eDate) else removeLeadingTrivia(eDate);
+				removeTrailingTrivia(eDate);
 				expr = processExpr(expr);
 
 				switch op {
@@ -77,12 +133,17 @@ class DateApi extends AbstractFilter {
 							case AOpAnd(t) | AOpOr(t):
 								throwError(t.pos, "Unsupported operation on Date properties");
 						}
-						var methodName = "get" + fieldName.charAt(0).toUpperCase() + fieldName.substring(1);
 						var clonedDate = cloneExpr(eDate);
 						removeLeadingTrivia(clonedDate);
 						removeTrailingTrivia(clonedDate);
-						var eMethod = mk(TEField({kind: TOExplicit(mkDot(), clonedDate), type: eDate.type}, methodName, mkIdent(methodName)), TTFunction, TTFunction);
-						var getterCall = e.with(kind = TECall(eMethod, {openParen: mkOpenParen(), args: [], closeParen: mkCloseParen()}));
+						var getterCall = if (fieldName == "milliseconds") {
+							var eMethod = mkBuiltin("ASCompat.ASDate.getMilliseconds", TTFunction);
+							e.with(kind = TECall(eMethod, {openParen: mkOpenParen(), args: [{expr: clonedDate, comma: null}], closeParen: mkCloseParen()}));
+						} else {
+							var methodName = "get" + fieldName.charAt(0).toUpperCase() + fieldName.substring(1);
+							var eMethod = mk(TEField({kind: TOExplicit(mkDot(), clonedDate), type: eDate.type}, methodName, mkIdent(methodName)), TTFunction, TTFunction);
+							e.with(kind = TECall(eMethod, {openParen: mkOpenParen(), args: [], closeParen: mkCloseParen()}));
+						}
 						expr = expr.with(kind = TEBinop(getterCall, newOp, expr));
 					case _:
 				}
@@ -99,11 +160,11 @@ class DateApi extends AbstractFilter {
 					   | "time"
 					   :
 						var methodName = "set" + fieldName.charAt(0).toUpperCase() + fieldName.substring(1);
-						var eMethod = mk(TEField(to, methodName, mkIdent(methodName, fieldToken.leadTrivia)), TTFunction, TTFunction);
+						var eMethod = mkBuiltin("ASCompat.ASDate." + methodName, TTFunction, lead);
 						e.with(kind = TECall(eMethod, {
 							openParen: mkOpenParen(),
-							args: [{expr: expr, comma: null}],
-							closeParen: mkCloseParen(fieldToken.trailTrivia)
+							args: [{expr: eDate, comma: commaWithSpace}, {expr: expr, comma: null}],
+							closeParen: mkCloseParen(trail)
 						}));
 
 					case _:
@@ -111,13 +172,17 @@ class DateApi extends AbstractFilter {
 				}
 
 			case TEField({kind: TOExplicit(dot, eDate = {type: TTInst({name: "Date", parentModule: {parentPack: {name: ""}}})})}, fieldName, fieldToken):
-				var to = {kind: TOExplicit(dot, processExpr(eDate)), type: eDate.type};
+				var lead = removeLeadingTrivia(e);
+				var trail = removeTrailingTrivia(e);
+				var dateExpr = processExpr(eDate);
+				if (lead.length == 0) lead = removeLeadingTrivia(dateExpr) else removeLeadingTrivia(dateExpr);
+				removeTrailingTrivia(dateExpr);
+				var to = {kind: TOExplicit(dot, dateExpr), type: eDate.type};
 				switch fieldName {
 					case "date"
 					   | "day"
 					   | "fullYear"
 					   | "hours"
-					   | "milliseconds"
 					   | "minutes"
 					   | "month"
 					   | "seconds"
@@ -125,11 +190,19 @@ class DateApi extends AbstractFilter {
 					   | "timezoneOffset"
 					   :
 						var methodName = "get" + fieldName.charAt(0).toUpperCase() + fieldName.substring(1);
-						var eMethod = mk(TEField(to, methodName, mkIdent(methodName, fieldToken.leadTrivia)), TTFunction, TTFunction);
+						var eMethod = mk(TEField(to, methodName, mkIdent(methodName, lead)), TTFunction, TTFunction);
 						e.with(kind = TECall(eMethod, {
 							openParen: mkOpenParen(),
 							args: [],
-							closeParen: mkCloseParen(fieldToken.trailTrivia)
+							closeParen: mkCloseParen(trail)
+						}));
+
+					case "milliseconds":
+						var eMethod = mkBuiltin("ASCompat.ASDate.getMilliseconds", TTFunction, lead);
+						e.with(kind = TECall(eMethod, {
+							openParen: mkOpenParen(),
+							args: [{expr: dateExpr, comma: null}],
+							closeParen: mkCloseParen(trail)
 						}));
 
 					case "valueOf":
@@ -137,11 +210,11 @@ class DateApi extends AbstractFilter {
 
 					case "dateUTC":
 						var methodName = "getUTCDate";
-						var eMethod = mk(TEField(to, methodName, mkIdent(methodName, fieldToken.leadTrivia)), TTFunction, TTFunction);
+						var eMethod = mk(TEField(to, methodName, mkIdent(methodName, lead)), TTFunction, TTFunction);
 						e.with(kind = TECall(eMethod, {
 							openParen: mkOpenParen(),
 							args: [],
-							closeParen: mkCloseParen(fieldToken.trailTrivia)
+							closeParen: mkCloseParen(trail)
 						}));
 
 					case _:

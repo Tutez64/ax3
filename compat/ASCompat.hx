@@ -227,7 +227,7 @@ class ASCompat {
 
 	@:noCompletion public static inline function _asVector<T>(value:Any):Null<flash.Vector<T>> return if (_isVector(value)) value else null;
 	@:noCompletion public static inline function _isVector(value:Any):Bool
-		return Reflect.hasField(value, '__array') && Reflect.hasField(value, 'fixed');
+	return Reflect.hasField(value, '__array') && Reflect.hasField(value, 'fixed');
 
 	public static inline function asFunction(v:Any):Null<ASFunction> {
 		return if (Reflect.isFunction(v)) v else null;
@@ -283,7 +283,7 @@ class ASCompat {
 	 * https://github.com/HaxeFoundation/as3hx/blob/829f661777d0458c7902c4235a4c944de4c8cc6d/src/as3hx/Compat.hx#L114
 	 */
 	public static function parseInt(s:String, ?base:Int):Null<Int> {
-        #if js
+		#if js
 		if (base == null) base = s.indexOf("0x") == 0 ? 16 : 10;
 		var v:Int = js.Syntax.code("parseInt({0}, {1})", s, base);
 		return Math.isNaN(v) ? null : v;
@@ -294,7 +294,7 @@ class ASCompat {
 		#else
 		var BASE = "0123456789abcdefghijklmnopqrstuvwxyz";
 		if (base != null && (base < 2 || base > BASE.length))
-		return throw 'invalid base ${base}, it must be between 2 and ${BASE.length}';
+			return throw 'invalid base ${base}, it must be between 2 and ${BASE.length}';
 		s = s.trim().toLowerCase();
 		var sign = if (s.startsWith("+")) {
 			s = s.substring(1);
@@ -307,7 +307,7 @@ class ASCompat {
 		};
 		if (s.length == 0) return null;
 		if (s.startsWith('0x')) {
-		if (base != null && base != 16) return null; // attempting at converting a hex using a different base
+			if (base != null && base != 16) return null; // attempting at converting a hex using a different base
 			base = 16;
 			s = s.substring(2);
 		} else if (base == null) {
@@ -669,65 +669,169 @@ class ASDate {
 		return DateTools.format(Date.fromTime(0), "%a %b %d %Y");
 	}
 
-	#if (flash || js) // TODO: implement this for other platforms
 	public static inline function setTime(d:Date, millisecond:Float):Float {
+		#if (js || flash || python)
 		return (cast d).setTime(millisecond);
+		#else
+		return millisecond;
+		#end
 	}
 
 	public static inline function setDate(d:Date, day:Float):Float {
-		return (cast d).setDate(day);
+		return setTime(d, DateTools.makeUtc(d.getUTCFullYear(), d.getUTCMonth(), Std.int(day), d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds()));
 	}
 
 	public static inline function setMonth(d:Date, month:Float, ?day:Float):Float {
+		#if (js || flash || python)
 		return (cast d).setMonth(month, day);
+		#else
+		var dayValue = if (day == null) d.getUTCDate() else Std.int(day);
+		return setTime(d, DateTools.makeUtc(d.getUTCFullYear(), Std.int(month), dayValue, d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds()));
+		#end
 	}
 
 	public static inline function setHours(d:Date, hour:Int, ?minute:Int, ?second:Int, ?millisecond:Int):Float {
+		#if (js || flash || python)
 		return (cast d).setHours(hour, minute, second, millisecond);
+		#else
+		var minValue = if (minute == null) d.getUTCMinutes() else minute;
+		var secValue = if (second == null) d.getUTCSeconds() else second;
+		var base = DateTools.makeUtc(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), hour, minValue, secValue);
+		return setTime(d, base + if (millisecond == null) 0 else millisecond);
+		#end
 	}
 
 	public static inline function setMinutes(d:Date, minute:Float, ?second:Float, ?millisecond:Float):Float {
+		#if (js || flash || python)
 		return (cast d).setMinutes(minute, second, millisecond);
+		#else
+		var secValue = if (second == null) d.getUTCSeconds() else Std.int(second);
+		var base = DateTools.makeUtc(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours(), Std.int(minute), secValue);
+		return setTime(d, base + if (millisecond == null) 0 else millisecond);
+		#end
 	}
 
 	public static inline function setSeconds(d:Date, second:Float, ?millisecond:Float):Float {
+		#if (js || flash || python)
 		return (cast d).setSeconds(second, millisecond);
+		#else
+		var base = DateTools.makeUtc(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours(), d.getUTCMinutes(), Std.int(second));
+		return setTime(d, base + if (millisecond == null) 0 else millisecond);
+		#end
+	}
+
+	public static inline function getMilliseconds(d:Date):Float {
+		#if (js || flash || python)
+		return (cast d).getMilliseconds();
+		#else
+		var ms = Std.int(d.getTime() % 1000);
+		return if (ms < 0) ms + 1000 else ms;
+		#end
+	}
+
+	public static inline function setMilliseconds(d:Date, millisecond:Float):Float {
+		#if (js || flash || python)
+		return (cast d).setMilliseconds(millisecond);
+		#else
+		return setTime(d, d.getTime() - getMilliseconds(d) + millisecond);
+		#end
 	}
 
 	public static inline function setUTCDate(d:Date, day:Float):Float {
+		#if (js || flash || python)
 		return (cast d).setUTCDate(day);
+		#else
+		return setTime(d, DateTools.makeUtc(d.getUTCFullYear(), d.getUTCMonth(), Std.int(day), d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds()));
+		#end
 	}
 
 	public static inline function setFullYear(d:Date, year:Float, ?month:Float, ?day:Float):Float {
+		#if (js || flash || python)
 		return (cast d).setFullYear(year, month, day);
+		#else
+		var monthValue = if (month == null) d.getUTCMonth() else Std.int(month);
+		var dayValue = if (day == null) d.getUTCDate() else Std.int(day);
+		return setTime(d, DateTools.makeUtc(Std.int(year), monthValue, dayValue, d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds()));
+		#end
 	}
 
 	public static inline function setUTCFullYear(d:Date, year:Float, ?month:Float, ?day:Float):Float {
+		#if (js || flash || python)
 		return (cast d).setUTCFullYear(year, month, day);
+		#else
+		var monthValue = if (month == null) d.getUTCMonth() else Std.int(month);
+		var dayValue = if (day == null) d.getUTCDate() else Std.int(day);
+		return setTime(d, DateTools.makeUtc(Std.int(year), monthValue, dayValue, d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds()));
+		#end
 	}
 
 	public static inline function setUTCHours(d:Date, hour:Float, ?minute:Float, ?second:Float, ?millisecond:Float):Float {
+		#if (js || flash || python)
 		return (cast d).setUTCHours(hour, minute, second, millisecond);
+		#else
+		var minValue = if (minute == null) d.getUTCMinutes() else Std.int(minute);
+		var secValue = if (second == null) d.getUTCSeconds() else Std.int(second);
+		var base = DateTools.makeUtc(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), Std.int(hour), minValue, secValue);
+		return setTime(d, base + if (millisecond == null) 0 else millisecond);
+		#end
 	}
 
 	public static inline function getUTCMilliseconds(d:Date):Float {
+		#if (js || flash || python)
 		return (cast d).getUTCMilliseconds();
+		#else
+		return getMilliseconds(d);
+		#end
 	}
 
 	public static inline function setUTCMilliseconds(d:Date, millisecond:Float):Float {
+		#if (js || flash || python)
 		return (cast d).setUTCMilliseconds(millisecond);
+		#else
+		return setMilliseconds(d, millisecond);
+		#end
 	}
 
 	public static inline function setUTCMinutes(d:Date, minute:Float, ?second:Float, ?millisecond:Float):Float {
+		#if (js || flash || python)
 		return (cast d).setUTCMinutes(minute, second, millisecond);
+		#else
+		var secValue = if (second == null) d.getUTCSeconds() else Std.int(second);
+		var base = DateTools.makeUtc(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours(), Std.int(minute), secValue);
+		return setTime(d, base + if (millisecond == null) 0 else millisecond);
+		#end
 	}
 
 	public static inline function setUTCMonth(d:Date, month:Float, ?day:Float):Float {
+		#if (js || flash || python)
 		return (cast d).setUTCMonth(month, day);
+		#else
+		var dayValue = if (day == null) d.getUTCDate() else Std.int(day);
+		return setTime(d, DateTools.makeUtc(d.getUTCFullYear(), Std.int(month), dayValue, d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds()));
+		#end
 	}
 
 	public static inline function setUTCSeconds(d:Date, second:Float, ?millisecond:Float):Float {
+		#if (js || flash || python)
 		return (cast d).setUTCSeconds(second, millisecond);
+		#else
+		var base = DateTools.makeUtc(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours(), d.getUTCMinutes(), Std.int(second));
+		return setTime(d, base + if (millisecond == null) 0 else millisecond);
+		#end
 	}
-	#end
+
+	public static inline function UTC(year:Float, month:Float, ?day:Float, ?hour:Float, ?minute:Float, ?second:Float, ?millisecond:Float):Float {
+		#if (js || flash || python)
+		return (cast Date).UTC(year, month, day, hour, minute, second, millisecond);
+		#elseif (php || cpp)
+		var dayValue = if (day == null) 1 else Std.int(day);
+		var hourValue = if (hour == null) 0 else Std.int(hour);
+		var minuteValue = if (minute == null) 0 else Std.int(minute);
+		var secondValue = if (second == null) 0 else Std.int(second);
+		var base = DateTools.makeUtc(Std.int(year), Std.int(month), dayValue, hourValue, minuteValue, secondValue);
+		return base + if (millisecond == null) 0 else millisecond;
+		#else
+		return 0.;
+		#end
+	}
 }

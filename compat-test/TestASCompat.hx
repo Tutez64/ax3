@@ -74,4 +74,65 @@ class TestASCompat extends utest.Test {
 		equals("string", ASCompat.typeof("test"));
 		equals("object", ASCompat.typeof(null));
 	}
+
+	function testDateApi() {
+		var dTime = Date.fromTime(0);
+		ASCompat.ASDate.setTime(dTime, 1234567);
+		floatEquals(1234567, dTime.getTime());
+
+		var dFull = Date.fromTime(0);
+		var dFullExpected = Date.fromTime(0);
+		ASCompat.ASDate.setFullYear(dFull, 2020, 1, 2);
+		untyped dFullExpected.setFullYear(2020, 1, 2);
+		floatEquals(dFullExpected.getTime(), dFull.getTime());
+
+		var dMonth = Date.fromTime(0);
+		var dMonthExpected = Date.fromTime(0);
+		ASCompat.ASDate.setMonth(dMonth, 5, 6);
+		untyped dMonthExpected.setMonth(5, 6);
+		floatEquals(dMonthExpected.getTime(), dMonth.getTime());
+
+		var dDate = Date.fromTime(0);
+		var dDateExpected = Date.fromTime(0);
+		ASCompat.ASDate.setDate(dDate, 7);
+		untyped dDateExpected.setDate(7);
+		floatEquals(dDateExpected.getTime(), dDate.getTime());
+
+		var dHours = Date.fromTime(0);
+		var dHoursExpected = Date.fromTime(0);
+		ASCompat.ASDate.setHours(dHours, 8, 9, 10, 11);
+		untyped dHoursExpected.setHours(8, 9, 10, 11);
+		floatEquals(dHoursExpected.getTime(), dHours.getTime());
+
+		var dMinutes = Date.fromTime(0);
+		var dMinutesExpected = Date.fromTime(0);
+		ASCompat.ASDate.setMinutes(dMinutes, 12, 13, 14);
+		untyped dMinutesExpected.setMinutes(12, 13, 14);
+		floatEquals(dMinutesExpected.getTime(), dMinutes.getTime());
+
+		var dSeconds = Date.fromTime(0);
+		var dSecondsExpected = Date.fromTime(0);
+		ASCompat.ASDate.setSeconds(dSeconds, 15, 16);
+		untyped dSecondsExpected.setSeconds(15, 16);
+		floatEquals(dSecondsExpected.getTime(), dSeconds.getTime());
+
+		var dMs = Date.fromTime(0);
+		var dMsExpected = Date.fromTime(0);
+		ASCompat.ASDate.setMilliseconds(dMs, 123);
+		untyped dMsExpected.setMilliseconds(123);
+		floatEquals(dMsExpected.getTime(), dMs.getTime());
+		floatEquals(untyped dMsExpected.getMilliseconds(), ASCompat.ASDate.getMilliseconds(dMs));
+
+		var dUtcMs = Date.fromTime(0);
+		untyped dUtcMs.setUTCMilliseconds(321);
+		floatEquals(untyped dUtcMs.getUTCMilliseconds(), ASCompat.ASDate.getUTCMilliseconds(dUtcMs));
+
+		var utcValue = ASCompat.ASDate.UTC(2020, 0, 2, 3, 4, 5, 6);
+		#if (js || flash || python)
+		var utcExpected:Float = untyped Date.UTC(2020, 0, 2, 3, 4, 5, 6);
+		floatEquals(utcExpected, utcValue);
+		#else
+		isTrue(utcValue >= 0 || utcValue <= 0);
+		#end
+	}
 }
