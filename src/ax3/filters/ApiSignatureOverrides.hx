@@ -29,32 +29,6 @@ class ApiSignatureOverrides extends AbstractFilter {
 		]},
 		{owner: "openfl.text.TextFormat", name: "new", isCtor: true, args: [
 			{index: 2, target: TTInt, coerce: ToInt, allowNull: true}
-		]},
-
-		// ByteArray numeric writes
-		{owner: "flash.utils.ByteArray", name: "writeUnsignedInt", isCtor: false, args: [
-			{index: 0, target: TTUint, coerce: ToUInt, allowNull: false}
-		]},
-		{owner: "flash.utils.ByteArray", name: "writeInt", isCtor: false, args: [
-			{index: 0, target: TTInt, coerce: ToInt, allowNull: false}
-		]},
-		{owner: "flash.utils.ByteArray", name: "writeShort", isCtor: false, args: [
-			{index: 0, target: TTInt, coerce: ToInt, allowNull: false}
-		]},
-		{owner: "flash.utils.ByteArray", name: "writeByte", isCtor: false, args: [
-			{index: 0, target: TTInt, coerce: ToInt, allowNull: false}
-		]},
-		{owner: "openfl.utils.ByteArray", name: "writeUnsignedInt", isCtor: false, args: [
-			{index: 0, target: TTUint, coerce: ToUInt, allowNull: false}
-		]},
-		{owner: "openfl.utils.ByteArray", name: "writeInt", isCtor: false, args: [
-			{index: 0, target: TTInt, coerce: ToInt, allowNull: false}
-		]},
-		{owner: "openfl.utils.ByteArray", name: "writeShort", isCtor: false, args: [
-			{index: 0, target: TTInt, coerce: ToInt, allowNull: false}
-		]},
-		{owner: "openfl.utils.ByteArray", name: "writeByte", isCtor: false, args: [
-			{index: 0, target: TTInt, coerce: ToInt, allowNull: false}
 		]}
 	];
 
@@ -93,7 +67,7 @@ class ApiSignatureOverrides extends AbstractFilter {
 		var changed = false;
 		var nextArgs = args.args.copy();
 		for (rule in overrides) {
-			if (rule.isCtor != isCtor || rule.name != name || rule.owner != fqn) continue;
+			if (rule.isCtor != isCtor || rule.name != name || !ownerMatches(cls, fqn, rule.owner)) continue;
 			for (argRule in rule.args) {
 				if (argRule.index >= args.args.length) continue;
 				var current = args.args[argRule.index];
@@ -195,5 +169,11 @@ class ApiSignatureOverrides extends AbstractFilter {
 	static function classFqn(c:TClassOrInterfaceDecl):String {
 		var pack = c.parentModule.parentPack.name;
 		return pack == "" ? c.name : pack + "." + c.name;
+	}
+
+	static function ownerMatches(cls:TClassOrInterfaceDecl, fqn:String, owner:String):Bool {
+		if (owner == fqn) return true;
+		if (owner.indexOf(".") == -1) return owner == cls.name;
+		return false;
 	}
 }
