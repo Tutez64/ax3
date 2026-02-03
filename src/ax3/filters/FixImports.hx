@@ -1,6 +1,7 @@
 package ax3.filters;
 
 import ax3.GenHaxe.canSkipTypeHint;
+import ax3.ParseTree;
 
 class FixImports extends AbstractFilter {
 	var usedClasses:Null<Map<TClassOrInterfaceDecl, Bool>>;
@@ -9,7 +10,7 @@ class FixImports extends AbstractFilter {
 	override function processExpr(e:TExpr):TExpr {
 		e = mapExpr(processExpr, e);
 		switch e.kind {
-			case TEBuiltin(_, name) if (name == "QName" || name == "ByteArray"):
+			case TEBuiltin(_, name) if (name == "QName" || name == "ByteArray" || name == "ArgumentError"):
 				if (neededImportNames != null) {
 					neededImportNames[name] = true;
 				}
@@ -23,6 +24,9 @@ class FixImports extends AbstractFilter {
 				markClassUsed(c);
 			case TENew(_, TNType(t), _):
 				markTypeUsed(t.type);
+				if (t.syntax != null) {
+					maybeMarkTypeName(t.syntax);
+				}
 			case TECast(c):
 				markTypeUsed(c.type);
 			case TEVector(_, t):
@@ -125,7 +129,11 @@ class FixImports extends AbstractFilter {
 		}
 		if (neededImportNames != null) {
 			for (name in neededImportNames.keys()) {
-				var cls = resolveFlashUtilsClass(name);
+				var cls = switch name {
+					case "QName" | "ByteArray": resolveFlashUtilsClass(name);
+					case "ArgumentError": resolveFlashErrorsClass(name);
+					case _: null;
+				};
 				if (cls != null && !hasImport(mod, cls)) {
 					needed.push(cls);
 				}
@@ -136,6 +144,17 @@ class FixImports extends AbstractFilter {
 		var trivia = getImportTrivia(mod);
 		for (cls in needed) {
 			mod.pack.imports.push(mkClassImport(cls, trivia.lead, trivia.trail));
+		}
+	}
+
+	function maybeMarkTypeName(syntax:SyntaxType) {
+		switch syntax {
+			case TPath(path):
+				var name = ParseTree.dotPathToString(path);
+				if (name == "ArgumentError") {
+					neededImportNames[name] = true;
+				}
+			case _:
 		}
 	}
 
@@ -177,6 +196,33 @@ class FixImports extends AbstractFilter {
 				parentPack: new TPackage("flash.utils"),
 				pack: null,
 				name: "flash.utils." + name,
+				privateDecls: [],
+				eof: null
+			},
+			name: name,
+			members: []
+		};
+	}
+
+	function resolveFlashErrorsClass(name:String):Null<TClassOrInterfaceDecl> {
+		var decl = try tree.getDecl("flash.errors", name) catch (_:Dynamic) null;
+		if (decl != null) {
+			return switch decl.kind {
+				case TDClassOrInterface(c): c;
+				case _: null;
+			};
+		}
+		return {
+			syntax: null,
+			kind: null,
+			metadata: [],
+			modifiers: [],
+			parentModule: {
+				isExtern: false,
+				path: "flash.errors." + name,
+				parentPack: new TPackage("flash.errors"),
+				pack: null,
+				name: "flash.errors." + name,
 				privateDecls: [],
 				eof: null
 			},
