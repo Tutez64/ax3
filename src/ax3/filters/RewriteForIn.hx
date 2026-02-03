@@ -28,30 +28,31 @@ class RewriteForIn extends AbstractFilter {
 
 	function makeHaxeFor(loopVar:LoopVarData, data:LoopData, body:TExpr):TExpr {
 		var loopVarVar, loopVarToken;
+		var outerDecl:Null<TVarDecl> = null;
 		var innerIndent = getInnerIndent(body);
 
 		switch loopVar.kind {
 			case LOwn(kind, decl):
-				if (kind.match(VConst(_)) && typeEq(loopVar.v.type, data.loopVarType)) {
-					// types are exactly the same, we can use the haxe loop var directly
-					loopVarVar = loopVar.v;
-					loopVarToken = mkIdent(loopVar.v.name, [], [whitespace]);
-				} else {
-					// types differ, use temp loop var and introduce
-					// a local var inside the loop body
-					loopVarToken = mkIdent(tempLoopVarName, [], [whitespace]);
-					loopVarVar = {name: tempLoopVarName, type: data.loopVarType};
+				outerDecl = {
+					syntax: {name: decl.syntax.name.clone(), type: decl.syntax.type},
+					v: loopVar.v,
+					init: null,
+					comma: null
+				};
+				outerDecl.syntax.name.leadTrivia = [];
+				outerDecl.syntax.name.trailTrivia = [];
 
-					var eVarInit = mk(TEVars(kind, [
-						decl.with(init = {
-							equalsToken: mkTokenWithSpaces(TkEquals, "="),
-							expr: mk(TELocal(mkIdent(tempLoopVarName), loopVarVar), data.loopVarType, loopVar.v.type)
-						})
-					]), TTVoid, TTVoid);
-					processLeadingToken(t -> t.leadTrivia = cloneTrivia(innerIndent), eVarInit);
+				// use temp loop var and assign to the declared var inside the loop body
+				loopVarToken = mkIdent(tempLoopVarName, [], [whitespace]);
+				loopVarVar = {name: tempLoopVarName, type: data.loopVarType};
 
-					body = concatExprs(eVarInit, body);
-				}
+				var eAssign = mk(TEBinop(
+					mk(TELocal(mkIdent(loopVar.v.name), loopVar.v), loopVar.v.type, loopVar.v.type),
+					OpAssign(mkTokenWithSpaces(TkEquals, "=")),
+					mk(TELocal(mkIdent(tempLoopVarName), loopVarVar), data.loopVarType, loopVar.v.type)
+				), TTVoid, TTVoid);
+				processLeadingToken(t -> t.leadTrivia = cloneTrivia(innerIndent), eAssign);
+				body = concatExprs(eAssign, body);
 
 			case LShared(eLocal):
 				// always use temp loop var and assign it to the shared var
@@ -106,9 +107,20 @@ class RewriteForIn extends AbstractFilter {
 		}
 
 		if (data.iterateeTempVar == null) {
-			return loopExpr;
+			if (outerDecl == null) {
+				return loopExpr;
+			}
+
+			var loopLead = takeLeadingTrivia(loopExpr);
+			var declToken = mkIdent("var", loopLead, [whitespace]);
+			var outerExpr = mk(TEVars(VVar(declToken), [outerDecl]), TTVoid, TTVoid);
+			return mkMergedBlock([
+				{expr: outerExpr, semicolon: addTrailingNewline(mkSemicolon())},
+				{expr: loopExpr, semicolon: null},
+			]);
 		} else {
-			var tempVarDecl = mk(TEVars(VConst(mkIdent("final", removeLeadingTrivia(loopExpr), [whitespace])), [{
+			var loopLead = takeLeadingTrivia(loopExpr);
+			var tempVarDecl = mk(TEVars(VConst(mkIdent("final", loopLead, [whitespace])), [{
 				syntax: {
 					name: mkIdent(data.iterateeTempVar.name),
 					type: null
@@ -120,10 +132,19 @@ class RewriteForIn extends AbstractFilter {
 				},
 				comma: null
 			}]), TTVoid, TTVoid);
-			return mkMergedBlock([
-				{expr: tempVarDecl, semicolon: semicolonWithSpace},
+			var loopExprs = [
+				{expr: tempVarDecl, semicolon: addTrailingNewline(mkSemicolon())},
 				{expr: loopExpr, semicolon: null},
-			]);
+			];
+			if (outerDecl == null) {
+				return mkMergedBlock(loopExprs);
+			}
+			var tempLead = takeLeadingTrivia(loopExprs[0].expr);
+			var declToken = mkIdent("var", tempLead, [whitespace]);
+			var outerExpr = mk(TEVars(VVar(declToken), [outerDecl]), TTVoid, TTVoid);
+			return mkMergedBlock([
+				{expr: outerExpr, semicolon: addTrailingNewline(mkSemicolon())},
+			].concat(loopExprs));
 		}
 	}
 
@@ -150,6 +171,12 @@ class RewriteForIn extends AbstractFilter {
 
 	function cloneTrivia(trivia:Array<Trivia>):Array<Trivia> {
 		return [for (item in trivia) new Trivia(item.kind, item.text)];
+	}
+
+	function takeLeadingTrivia(expr:TExpr):Array<Trivia> {
+		var lead = removeLeadingTrivia(expr);
+		processLeadingToken(t -> t.leadTrivia = cloneTrivia(lead).concat(t.leadTrivia), expr);
+		return lead;
 	}
 
 	inline function maybeTempVarIteratee(e:TExpr):{expr:TExpr, tempVar:Null<TVar>} {

@@ -4,12 +4,37 @@ import ax3.Token.nullToken;
 import ax3.TokenTools.mkIdent;
 import ax3.TokenTools.mkDot;
 import ax3.ParseTree.dotPathToArray;
+import ax3.ParseTree.dotPathToString;
 
 // TODO: handle unimported globals from toplevel package (expr filter?)
 class ExternModuleLevelImports extends AbstractFilter {
 	final globals = new Map<String, {dotPath:String, kind:TDeclKind}>();
+	var pendingGlobals:Null<Map<String, {dotPath:String, decl:TDecl}>> = null;
 
 	static final asToken = mkIdent("as", [whitespace], [whitespace]);
+
+	override function processModule(mod:TModule) {
+		pendingGlobals = new Map();
+		super.processModule(mod);
+		addPendingImports(mod);
+		pendingGlobals = null;
+	}
+
+	override function processExpr(e:TExpr):TExpr {
+		e = mapExpr(processExpr, e);
+		switch e.kind {
+			case TEDeclRef(_, {kind: TDFunction(f)}):
+				var dotPath = f.parentModule.parentPack.name + "." + f.parentModule.name;
+				if (!isIgnoredImport(dotPath) && dotPath == "flash.utils.getQualifiedClassName") {
+					var fieldName = dotPath.split(".").join("_");
+					if (pendingGlobals != null && !pendingGlobals.exists(fieldName)) {
+						pendingGlobals[fieldName] = {dotPath: dotPath, decl: {name: f.name, kind: TDFunction(f)}};
+					}
+				}
+			case _:
+		}
+		return e;
+	}
 
 	override function processImport(i:TImport):Bool {
 		switch i.kind {
@@ -332,5 +357,73 @@ class ExternModuleLevelImports extends AbstractFilter {
 			};
 			pack.addModule(mod);
 		}
+	}
+
+	function addPendingImports(mod:TModule) {
+		if (pendingGlobals == null || pendingGlobals.iterator().hasNext() == false) return;
+		var trivia = getImportTrivia(mod);
+		for (fieldName => entry in pendingGlobals) {
+			if (hasGlobalImport(mod, fieldName, entry.decl.name)) {
+				continue;
+			}
+			globals[fieldName] = {dotPath: entry.dotPath, kind: entry.decl.kind};
+			mod.pack.imports.push(mkAliasedImport(entry.decl, fieldName, trivia.lead, trivia.trail));
+		}
+	}
+
+	function hasGlobalImport(mod:TModule, fieldName:String, declName:String):Bool {
+		for (i in mod.pack.imports) {
+			switch i.kind {
+				case TIAliased(_, _, name):
+					if (name.text == declName && dotPathToString(i.syntax.path) == "Globals." + fieldName) {
+						return true;
+					}
+				case _:
+			}
+		}
+		return false;
+	}
+
+	function mkAliasedImport(decl:TDecl, fieldName:String, lead:Array<Trivia>, trail:Array<Trivia>):TImport {
+		return {
+			syntax: {
+				condCompBegin: null,
+				keyword: mkIdent("import", cloneTrivia(lead), [whitespace]),
+				path: dotPathFromString("Globals." + fieldName, []),
+				semicolon: addTrailingTrivia(mkSemicolon(), trail),
+				condCompEnd: null
+			},
+			kind: TIAliased(decl, asToken, mkIdent(decl.name))
+		};
+	}
+
+	function getImportTrivia(mod:TModule):{lead:Array<Trivia>, trail:Array<Trivia>} {
+		if (mod.pack.imports.length > 0) {
+			var last = mod.pack.imports[mod.pack.imports.length - 1];
+			return {
+				lead: cloneTrivia(last.syntax.keyword.leadTrivia),
+				trail: cloneTrivia(last.syntax.semicolon.trailTrivia)
+			};
+		}
+		return {lead: [newline, whitespace], trail: [newline]};
+	}
+
+	function dotPathFromString(path:String, lead:Array<Trivia>):DotPath {
+		var parts = path.split(".");
+		var first = mkIdent(parts[0], lead, []);
+		var rest = [];
+		for (i in 1...parts.length) {
+			rest.push({sep: mkDot(), element: mkIdent(parts[i])});
+		}
+		return {first: first, rest: rest};
+	}
+
+	function addTrailingTrivia(token:Token, trivia:Array<Trivia>):Token {
+		for (t in trivia) token.trailTrivia.push(t);
+		return token;
+	}
+
+	function cloneTrivia(trivia:Array<Trivia>):Array<Trivia> {
+		return [for (item in trivia) new Trivia(item.kind, item.text)];
 	}
 }

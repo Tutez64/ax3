@@ -21,6 +21,15 @@ class HoistLocalDecls extends AbstractFilter {
 				var updated = hoistBlock(block);
 				if (updated == block) e else e.with(kind = TEBlock(updated));
 
+			case TELocalFunction(f):
+				var oldHoist = globalHoist;
+				globalHoist = new Map();
+				if (f.fun.expr != null) {
+					f.fun.expr = processExpr(f.fun.expr);
+				}
+				globalHoist = oldHoist;
+				e.with(kind = TELocalFunction(f));
+
 			case _:
 				mapExpr(processExpr, e);
 		};
@@ -30,6 +39,7 @@ class HoistLocalDecls extends AbstractFilter {
 		var directDecls = new Map<TVar, DeclInfo>();
 		var allDecls = new Map<TVar, DeclInfo>();
 		var declOrder:Array<TVar> = [];
+		var nameToVar = new Map<String, TVar>();
 
 		for (blockExpr in block.exprs) {
 			switch blockExpr.expr.kind {
@@ -40,6 +50,9 @@ class HoistLocalDecls extends AbstractFilter {
 							directDecls[decl.v] = info;
 							allDecls[decl.v] = info;
 							declOrder.push(decl.v);
+							if (!nameToVar.exists(decl.v.name)) {
+								nameToVar[decl.v.name] = decl.v;
+							}
 						}
 					}
 				case _:
@@ -48,7 +61,8 @@ class HoistLocalDecls extends AbstractFilter {
 		}
 
 		if (declOrder.length == 0) {
-			return block;
+			var updatedExprs = mapBlockExprs(processExpr, block.exprs);
+			return if (updatedExprs == block.exprs) block else block.with(exprs = updatedExprs);
 		}
 
 		var declared = new Map<TVar, Bool>();
@@ -70,6 +84,23 @@ class HoistLocalDecls extends AbstractFilter {
 					case TELocal(_, v):
 						if (!declared.exists(v) && allDecls.exists(v)) {
 							hoist[v] = true;
+						} else if (!declared.exists(v)) {
+							var named = nameToVar[v.name];
+							if (named != null && !declared.exists(named)) {
+								hoist[named] = true;
+							}
+						}
+					case TEField({kind: TOImplicitThis(_) | TOImplicitClass(_)}, fieldName, _):
+						var v = nameToVar[fieldName];
+						if (v != null && !declared.exists(v)) {
+							hoist[v] = true;
+						}
+					case TEDeclRef(path, _):
+						if (path.rest.length == 0) {
+							var v = nameToVar[path.first.text];
+							if (v != null && !declared.exists(v)) {
+								hoist[v] = true;
+							}
 						}
 					case _:
 				}
@@ -92,7 +123,6 @@ class HoistLocalDecls extends AbstractFilter {
 			hasHoisted = true;
 			break;
 		}
-
 		if (!hasHoisted) {
 			var updatedExprs = mapBlockExprs(function(e) {
 				return processExpr(rewriteVars(e, hoist));
@@ -143,19 +173,110 @@ class HoistLocalDecls extends AbstractFilter {
 	}
 
 	function collectNestedDecls(e:TExpr, decls:Map<TVar, DeclInfo>, order:Array<TVar>) {
-		switch e.kind {
-			case TEVars(kind, varDecls):
-				for (decl in varDecls) {
-					if (!decls.exists(decl.v)) {
-						decls[decl.v] = {decl: decl, kind: kind};
-						order.push(decl.v);
+		function walk(expr:TExpr) {
+			switch expr.kind {
+				case TEVars(kind, varDecls):
+					for (decl in varDecls) {
+						if (!decls.exists(decl.v)) {
+							decls[decl.v] = {decl: decl, kind: kind};
+							order.push(decl.v);
+						}
+						if (decl.init != null) {
+							walk(decl.init.expr);
+						}
 					}
-				}
-			case TELocalFunction(_):
-				return;
-			case _:
-				iterExpr(function(ee) collectNestedDecls(ee, decls, order), e);
+				case TELocalFunction(_):
+					return;
+				case TEBlock(block):
+					for (b in block.exprs) walk(b.expr);
+				case TEIf(i):
+					walk(i.econd);
+					walk(i.ethen);
+					if (i.eelse != null) walk(i.eelse.expr);
+				case TETry(t):
+					walk(t.expr);
+					for (c in t.catches) walk(c.expr);
+				case TESwitch(s):
+					walk(s.subj);
+					for (c in s.cases) {
+						for (v in c.values) walk(v);
+						for (b in c.body) walk(b.expr);
+					}
+					if (s.def != null) {
+						for (b in s.def.body) walk(b.expr);
+					}
+				case TECall(eobj, args):
+					walk(eobj);
+					for (arg in args.args) walk(arg.expr);
+				case TEArrayDecl(a):
+					for (el in a.elements) walk(el.expr);
+				case TEVectorDecl(v):
+					for (el in v.elements.elements) walk(el.expr);
+				case TEArrayAccess(a):
+					walk(a.eobj);
+					walk(a.eindex);
+				case TEObjectDecl(o):
+					for (f in o.fields) walk(f.expr);
+				case TEReturn(_, e) | TETypeof(_, e) | TEThrow(_, e) | TEDelete(_, e):
+					if (e != null) walk(e);
+				case TEParens(_, e, _):
+					walk(e);
+				case TECast(c):
+					walk(c.expr);
+				case TEField({kind: TOExplicit(_, e)}, _, _):
+					walk(e);
+				case TETernary(t):
+					walk(t.econd);
+					walk(t.ethen);
+					walk(t.eelse);
+				case TEWhile(w):
+					walk(w.cond);
+					walk(w.body);
+				case TEDoWhile(w):
+					walk(w.body);
+					walk(w.cond);
+				case TEHaxeFor(f):
+					walk(f.iter);
+					walk(f.body);
+				case TEFor(f):
+					if (f.einit != null) walk(f.einit);
+					if (f.econd != null) walk(f.econd);
+					if (f.eincr != null) walk(f.eincr);
+					walk(f.body);
+				case TEForIn(f):
+					walk(f.iter.eit);
+					walk(f.iter.eobj);
+					walk(f.body);
+				case TEForEach(f):
+					walk(f.iter.eit);
+					walk(f.iter.eobj);
+					walk(f.body);
+				case TEAs(e, _, _):
+					walk(e);
+				case TENew(_, TNExpr(e), _):
+					walk(e);
+				case TENew(_, TNType(_), _):
+				case TEHaxeRetype(e):
+					walk(e);
+				case TEHaxeIntIter(start, end):
+					walk(start);
+					walk(end);
+				case TECondCompBlock(_, expr):
+					walk(expr);
+				case TEXmlChild(x): walk(x.eobj);
+				case TEXmlAttr(x): walk(x.eobj);
+				case TEXmlAttrExpr(x): walk(x.eobj);
+				case TEXmlDescend(x): walk(x.eobj);
+				case TEPreUnop(_, e) | TEPostUnop(e, _):
+					walk(e);
+				case TEBinop(a, _, b):
+					walk(a);
+					walk(b);
+				case TEVector(_) | TELiteral(_) | TEUseNamespace(_) | TELocal(_) | TEBuiltin(_) | TEDeclRef(_) | TEBreak(_) | TEContinue(_) | TECondCompValue(_):
+				case _:
+			}
 		}
+		walk(e);
 	}
 
 	function rewriteVars(expr:TExpr, hoist:Map<TVar, Bool>):TExpr {

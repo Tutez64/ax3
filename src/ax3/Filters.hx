@@ -69,6 +69,7 @@ class Filters {
 			new ArrayApi(context),
 			new StringApi(context),
 			new NumberApi(context),
+			new RewriteArguments(context),
 			new FunctionApply(context),
 			new ToString(context),
 			new NamespacedToPublic(context),
