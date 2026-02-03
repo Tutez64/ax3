@@ -17,6 +17,22 @@ class TestASCompat extends utest.Test {
 		isTrue(ASCompat.isVector(new flash.Vector<String>(), (_:ASAny)));
 	}
 
+	function testVectorSpliceInsert() {
+		var v = new flash.Vector<Int>();
+		v.push(1);
+		v.push(2);
+		v.push(3);
+
+		var removed = ASCompat.vectorSplice(v, 1, 1, [9, 8]);
+		equals(1, removed.length);
+		equals(2, removed[0]);
+		equals(4, v.length);
+		equals(1, v[0]);
+		equals(9, v[1]);
+		equals(8, v[2]);
+		equals(3, v[3]);
+	}
+
 	function testArraySortWithOptions() {
 		var values = [3, 1, 2];
 		ASCompat.ASArray.sortWithOptions(values, ASCompat.ASArray.NUMERIC | ASCompat.ASArray.DESCENDING);

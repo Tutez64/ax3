@@ -87,6 +87,10 @@ class ASCompat {
 				throw new Error("processNull can only be called with Null<Int/UInt/Bool/Float>", e.pos);
 		}
 	}
+
+	static inline function textFieldGetXMLText(field:Dynamic, ?beginIndex:Int, ?endIndex:Int):String {
+		return "";
+	}
 }
 
 class ASArray {
@@ -96,6 +100,18 @@ class ASArray {
 
 	static function unshiftMultiple<T>(a:Expr, first:Expr, rest:Array<Expr>):Expr {
 		return makeMultipleAppend("unshift", a, first, rest);
+	}
+
+	public static inline function reverse<T>(a:Array<T>):Array<T> {
+		return a;
+	}
+
+	public static inline function some<T>(a:Array<T>, callback:(item:T, index:Int, array:Array<T>)->Bool, ?thisObj:Dynamic):Bool {
+		return false;
+	}
+
+	public static inline function map<T, U>(a:Array<T>, callback:(item:T, index:Int, array:Array<T>)->U, ?thisObj:Dynamic):Array<U> {
+		return [];
 	}
 
 	static function makeMultipleAppend(methodName:String, object:Expr, firstValue:Expr, rest:Array<Expr>):Expr {
@@ -108,6 +124,16 @@ class ASArray {
 			var ___arr = $object;
 			$b{exprs};
 		};
+	}
+}
+
+class ASVector {
+	public static inline function reverse<T>(a:Dynamic):Dynamic {
+		return a;
+	}
+
+	public static inline function map<T, U>(a:Dynamic, callback:(item:T, index:Int, vector:Dynamic)->U, ?thisObj:Dynamic):Dynamic {
+		return a;
 	}
 }
 #end

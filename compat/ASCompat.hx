@@ -215,10 +215,21 @@ class ASCompat {
 		var result = a.splice(startIndex, deleteCount);
 		if (values != null) {
 			for (i in 0...values.length) {
-				a.insertAt(startIndex + i, values[i]);
+				vectorInsertAt(a, startIndex + i, values[i]);
 			}
 		}
 		return result;
+	}
+
+	static function vectorInsertAt<T>(a:flash.Vector<T>, index:Int, value:T):Void {
+		var len = a.length;
+		a.length = len + 1;
+		var i = len;
+		while (i > index) {
+			a[i] = a[i - 1];
+			i--;
+		}
+		a[index] = value;
 	}
 
 	public static macro function vectorClass<T>(typecheck:Expr):ExprOf<Class<flash.Vector<T>>>;
@@ -250,6 +261,17 @@ class ASCompat {
 		untyped __global__["flash.utils.clearInterval"](id);
 		#else
 		js.Browser.window.clearInterval(id);
+		#end
+	}
+
+	public static inline function textFieldGetXMLText(field:flash.text.TextField, ?beginIndex:Int, ?endIndex:Int):String {
+		#if flash
+		return untyped field.getXMLText(beginIndex, endIndex);
+		#else
+		var text = field.text;
+		if (beginIndex == null) return text;
+		if (endIndex == null) return text.substr(beginIndex);
+		return text.substring(beginIndex, endIndex);
 		#end
 	}
 
@@ -332,9 +354,51 @@ class ASArray {
 	public static inline final RETURNINDEXEDARRAY = 8;
 	public static inline final UNIQUESORT = 4;
 
-	public static inline function sort<T>(a:Array<T>, f:(T, T) -> Int):Array<T> {
-		a.sort(f);
+	public static inline function reverse<T>(a:Array<T>):Array<T> {
+		a.reverse();
 		return a;
+	}
+
+	public static function some<T>(a:Array<T>, callback:(item:T, index:Int, array:Array<T>)->Bool, ?thisObj:Dynamic):Bool {
+		for (i in 0...a.length) {
+			var result:Bool =
+				if (thisObj != null) Reflect.callMethod(thisObj, callback, [a[i], i, a])
+				else Reflect.callMethod(null, callback, [a[i], i, a]);
+			if (result) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	public static inline function map<T, U>(a:Array<T>, callback:(item:T, index:Int, array:Array<T>)->U, ?thisObj:Dynamic):Array<U> {
+		var out:Array<U> = [];
+		for (i in 0...a.length) {
+			var value:U =
+				if (thisObj != null) Reflect.callMethod(thisObj, callback, [a[i], i, a])
+				else Reflect.callMethod(null, callback, [a[i], i, a]);
+			out.push(value);
+		}
+		return out;
+	}
+
+	public static function sort<T>(a:Array<T>, f:Dynamic):Array<T> {
+		if (f == null) {
+			a.sort(Reflect.compare);
+			return a;
+		}
+		a.sort(function(x, y) {
+			var result:Dynamic = Reflect.callMethod(null, f, [x, y]);
+			return coerceSortResult(result);
+		});
+		return a;
+	}
+
+	static inline function coerceSortResult(value:Dynamic):Int {
+		if (Std.isOfType(value, Int)) return value;
+		if (Std.isOfType(value, Float)) return Std.int(value);
+		if (Std.isOfType(value, Bool)) return value ? 1 : 0;
+		return Std.int(ASCompat.toNumber(value));
 	}
 
 	public static inline function sortOn<T>(a:Array<T>, fieldName:Dynamic, options:Dynamic):Array<T> {
@@ -359,9 +423,47 @@ class ASArray {
 
 
 class ASVector {
-	public static inline function sort<T>(a:flash.Vector<T>, f:(T, T) -> Int):flash.Vector<T> {
-		a.sort(f);
+	public static inline function reverse<T>(a:flash.Vector<T>):flash.Vector<T> {
+		#if flash
+		return (cast a).reverse();
+		#else
+		var items = [for (i in 0...a.length) a[i]];
+		items.reverse();
+		for (i in 0...items.length) {
+			a[i] = items[i];
+		}
 		return a;
+		#end
+	}
+
+	public static inline function map<T, U>(a:flash.Vector<T>, callback:(item:T, index:Int, vector:flash.Vector<T>)->U, ?thisObj:Dynamic):flash.Vector<U> {
+		var out = new flash.Vector<U>();
+		for (i in 0...a.length) {
+			var value:U =
+				if (thisObj != null) Reflect.callMethod(thisObj, callback, [a[i], i, a])
+				else Reflect.callMethod(null, callback, [a[i], i, a]);
+			out.push(value);
+		}
+		return out;
+	}
+
+	public static function sort<T>(a:flash.Vector<T>, f:Dynamic):flash.Vector<T> {
+		if (f == null) {
+			a.sort(Reflect.compare);
+			return a;
+		}
+		a.sort(function(x, y) {
+			var result:Dynamic = Reflect.callMethod(null, f, [x, y]);
+			return coerceSortResult(result);
+		});
+		return a;
+	}
+
+	static inline function coerceSortResult(value:Dynamic):Int {
+		if (Std.isOfType(value, Int)) return value;
+		if (Std.isOfType(value, Float)) return Std.int(value);
+		if (Std.isOfType(value, Bool)) return value ? 1 : 0;
+		return Std.int(ASCompat.toNumber(value));
 	}
 
 	public static inline function sortWithOptions<T>(a:flash.Vector<T>, options:Int):flash.Vector<T> {
@@ -690,13 +792,13 @@ class ASDate {
 		#end
 	}
 
-	public static inline function setHours(d:Date, hour:Int, ?minute:Int, ?second:Int, ?millisecond:Int):Float {
+	public static inline function setHours(d:Date, hour:Float, ?minute:Int, ?second:Int, ?millisecond:Int):Float {
 		#if (js || flash || python)
 		return (cast d).setHours(hour, minute, second, millisecond);
 		#else
 		var minValue = if (minute == null) d.getUTCMinutes() else minute;
 		var secValue = if (second == null) d.getUTCSeconds() else second;
-		var base = DateTools.makeUtc(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), hour, minValue, secValue);
+		var base = DateTools.makeUtc(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), Std.int(hour), minValue, secValue);
 		return setTime(d, base + if (millisecond == null) 0 else millisecond);
 		#end
 	}

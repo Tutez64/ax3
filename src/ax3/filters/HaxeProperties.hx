@@ -1,5 +1,7 @@
 package ax3.filters;
 
+import ax3.TypedTreeTools;
+
 private typedef Modifiers = {
 	final isPublic:Bool;
 	final isStatic:Bool;
@@ -121,8 +123,9 @@ class HaxeProperties extends AbstractFilter {
 	}
 
 	function processGetter(field:TClassField, accessor:TAccessorField, mods:Modifiers, leadToken:Token) {
-		removePublicModifier(field);
-		if (!mods.isOverride) {
+		var shouldCreateProperty = !mods.isOverride && !hasAccessorInSuper(accessor.name);
+		if (shouldCreateProperty) {
+			removePublicModifier(field);
 			var prop = addProperty(accessor.name, false, accessor.fun.sig.ret.type, mods, leadToken, removeMetadata(field));
 			if (prop != null) {
 				accessor.haxeProperty = prop;
@@ -144,7 +147,10 @@ class HaxeProperties extends AbstractFilter {
 			syntax: null
 		};
 
-		removePublicModifier(field);
+		var shouldCreateProperty = !mods.isOverride && !hasAccessorInSuper(accessor.name);
+		if (shouldCreateProperty) {
+			removePublicModifier(field);
+		}
 
 		if (accessor.fun.expr != null) {
 			// TODO: I think we should ensure that argument local var is never modified, because
@@ -195,7 +201,7 @@ class HaxeProperties extends AbstractFilter {
 			accessor.fun.expr = funExpr;
 		}
 
-		if (!mods.isOverride) {
+		if (shouldCreateProperty) {
 			var prop = addProperty(accessor.name, true, type, mods, leadToken, removeMetadata(field));
 			if (prop != null) {
 				accessor.haxeProperty = prop;
@@ -212,5 +218,36 @@ class HaxeProperties extends AbstractFilter {
 		var result = field.metadata;
 		field.metadata = [];
 		return result;
+	}
+
+	function hasAccessorInSuper(name:String):Bool {
+		var superClass = getSuperClass(currentClass);
+		while (superClass != null) {
+			for (member in superClass.members) {
+				switch member {
+					case TMField(f) if (!TypedTreeTools.isFieldStatic(f)):
+						switch f.kind {
+							case TFGetter(a) if (a.name == name):
+								return true;
+							case TFSetter(a) if (a.name == name):
+								return true;
+							case _:
+						}
+					case _:
+				}
+			}
+			superClass = getSuperClass(superClass);
+		}
+		return false;
+	}
+
+	static function getSuperClass(c:TClassOrInterfaceDecl):Null<TClassOrInterfaceDecl> {
+		if (c == null) return null;
+		return switch c.kind {
+			case TClass(info):
+				info.extend != null ? info.extend.superClass : null;
+			case _:
+				null;
+		}
 	}
 }
