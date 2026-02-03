@@ -67,6 +67,7 @@ class Filters {
 			new AddRequiredParens(context),
 			// new CheckExpectedTypes(context)
 			new DateApi(context),
+			new ApiSignatureOverrides(context),
 			new ArrayApi(context),
 			new StringApi(context),
 			new NumberApi(context),
