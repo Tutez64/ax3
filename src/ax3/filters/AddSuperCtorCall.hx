@@ -30,23 +30,17 @@ class AddSuperCtorCall extends AbstractFilter {
 	}
 
 	function hasSuperCall(e:TExpr):Bool {
-		switch e.kind {
-			case TEParens(_, e, _):
-				return hasSuperCall(e);
-
-			case TECall({kind: TELiteral(TLSuper(_))}, _):
-				return true;
-
-			case TEBlock(block):
-				for (e in block.exprs) {
-					if (hasSuperCall(e.expr)) {
-						return true;
-					}
-				}
-				return false;
-
-			case _:
-				return false;
+		var found = false;
+		function loop(expr:TExpr) {
+			if (found) return;
+			switch expr.kind {
+				case TECall({kind: TELiteral(TLSuper(_))}, _):
+					found = true;
+				case _:
+					iterExpr(loop, expr);
+			}
 		}
+		loop(e);
+		return found;
 	}
 }
