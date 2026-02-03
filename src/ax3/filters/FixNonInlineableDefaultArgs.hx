@@ -7,30 +7,24 @@ class FixNonInlineableDefaultArgs extends AbstractFilter {
 		var indent = getInnerIndent(fun.expr);
 		for (arg in fun.sig.args) {
 			switch arg.kind {
-				case TArgNormal(type, init = {expr: {kind: TEField({type: TTStatic(cls)}, fieldName, fieldToken)}}):
-					switch cls.findField(fieldName, true) {
-						case {kind: TFVar(f)}:
-							if (!f.isInline) {
-								var eLocal = mk(TELocal(mkIdent(arg.name), arg.v), arg.v.type, arg.v.type);
-								var check = mk(TEIf({
-									syntax: {
-										keyword: mkIdent("if", indent, [whitespace]),
-										openParen: mkOpenParen(),
-										closeParen: addTrailingWhitespace(mkCloseParen())
-									},
-									econd: mk(TEBinop(eLocal, OpEquals(mkEqualsEqualsToken()), mkNullExpr()), TTBoolean, TTBoolean),
-									ethen: mk(TEBinop(eLocal, OpAssign(new Token(0, TkEquals, "=", [whitespace], [whitespace])), init.expr), eLocal.type, eLocal.type),
-									eelse: null
-								}), TTVoid, TTVoid);
-								initExprs.push({
-									expr: check,
-									semicolon: addTrailingNewline(mkSemicolon()),
-								});
-								arg.kind = TArgNormal(type, init.with(expr = mkNullExpr()));
-							}
-
-						case _:
-							throwError(init.equalsToken.pos, "Unsupported default arg initialization");
+				case TArgNormal(type, init = {expr: initExpr}):
+					if (!isConstantExpr(initExpr)) {
+						var eLocal = mk(TELocal(mkIdent(arg.name), arg.v), arg.v.type, arg.v.type);
+						var check = mk(TEIf({
+							syntax: {
+								keyword: mkIdent("if", indent, [whitespace]),
+								openParen: mkOpenParen(),
+								closeParen: addTrailingWhitespace(mkCloseParen())
+							},
+							econd: mk(TEBinop(eLocal, OpEquals(mkEqualsEqualsToken()), mkNullExpr()), TTBoolean, TTBoolean),
+							ethen: mk(TEBinop(eLocal, OpAssign(new Token(0, TkEquals, "=", [whitespace], [whitespace])), init.expr), eLocal.type, eLocal.type),
+							eelse: null
+						}), TTVoid, TTVoid);
+						initExprs.push({
+							expr: check,
+							semicolon: addTrailingNewline(mkSemicolon()),
+						});
+						arg.kind = TArgNormal(type, init.with(expr = mkNullExpr(arg.type)));
 					}
 				case _:
 			}
@@ -44,6 +38,31 @@ class FixNonInlineableDefaultArgs extends AbstractFilter {
 				exprs: initExprs,
 			}), TTVoid, TTVoid);
 			fun.expr = concatExprs(initBlock, fun.expr);
+		}
+	}
+
+	static function isConstantExpr(e:TExpr):Bool {
+		return switch e.kind {
+			case TEParens(_, e2, _):
+				isConstantExpr(e2);
+
+			case TEField(obj, fieldName, _):
+				switch obj.type {
+					case TTStatic(cls):
+						var f = cls.findFieldInHierarchy(fieldName, true);
+						(f != null) && f.field.kind.match(TFVar({kind: VConst(_)}));
+					case _:
+						false;
+				}
+
+			case TEDeclRef(_):
+				true;
+
+			case TELiteral(TLBool(_) | TLNull(_) | TLUndefined(_) | TLInt(_) | TLNumber(_) | TLString(_)):
+				true;
+
+			case _:
+				false;
 		}
 	}
 }
