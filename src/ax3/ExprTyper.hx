@@ -928,10 +928,52 @@ class ExprTyper {
 	function typeLiteral(l:Literal, expectedType:TType):TExpr {
 		return switch (l) {
 			case LString(t): mk(TELiteral(TLString(t)), TTString, expectedType);
-			case LDecInt(t) | LHexInt(t): mk(TELiteral(TLInt(t)), TTInt, expectedType);
+			case LDecInt(t):
+				var litType = isSignedIntLiteral(t, false) ? TTInt : TTNumber;
+				mk(TELiteral(TLInt(t)), litType, expectedType);
+			case LHexInt(t):
+				var litType = isSignedIntLiteral(t, true) ? TTInt : TTNumber;
+				mk(TELiteral(TLInt(t)), litType, expectedType);
 			case LFloat(t): mk(TELiteral(TLNumber(t)), TTNumber, expectedType);
 			case LRegExp(t): mk(TELiteral(TLRegExp(t)), TTRegExp, expectedType);
 		}
+	}
+
+	static function isSignedIntLiteral(token:Token, isHex:Bool):Bool {
+		var text = token.text;
+		if (isHex) {
+			if (text.length > 1 && (text.substr(0, 2) == "0x" || text.substr(0, 2) == "0X")) {
+				text = text.substr(2);
+			}
+			text = trimLeadingZeros(text);
+			if (text.length == 0) return true;
+			if (text.length < 8) return true;
+			if (text.length > 8) return false;
+			return compareString(text.toLowerCase(), "7fffffff") <= 0;
+		} else {
+			text = trimLeadingZeros(text);
+			if (text.length < 10) return true;
+			if (text.length > 10) return false;
+			return compareString(text, "2147483647") <= 0;
+		}
+	}
+
+	static function trimLeadingZeros(text:String):String {
+		var i = 0;
+		while (i < text.length - 1 && text.charAt(i) == "0") {
+			i++;
+		}
+		return text.substr(i);
+	}
+
+	static function compareString(a:String, b:String):Int {
+		if (a.length != b.length) return a.length < b.length ? -1 : 1;
+		for (i in 0...a.length) {
+			var ac = a.charCodeAt(i);
+			var bc = b.charCodeAt(i);
+			if (ac != bc) return ac < bc ? -1 : 1;
+		}
+		return 0;
 	}
 
 	function typeObjectDecl(openBrace:Token, fields:Separated<ObjectField>, closeBrace:Token, expectedType:TType):TExpr {
@@ -1497,7 +1539,7 @@ class ExprTyper {
 			case PreNeg(_): inType = outType = TTNumber;
 			case PreIncr(_): inType = outType = TTNumber;
 			case PreDecr(_): inType = outType = TTNumber;
-			case PreBitNeg(_): inType = TTNumber; outType = TTInt;
+			case PreBitNeg(_): inType = TTInt; outType = TTInt;
 		}
 		var e = typeExpr(e, inType);
 		if (outType == TTNumber && e.type.match(TTInt | TTUint)) {

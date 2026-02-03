@@ -16,8 +16,15 @@ package {
             var char:* = s.charAt(n);
 
             takeInt(n);
+
+            var bigDec:* = 2303741511;
+            var bigHex:* = 0xFFFFFFFF;
+            takeUInt(bigDec);
+            takeUInt(bigHex);
         }
 
         public function takeInt(val:int):void {}
+
+        public function takeUInt(val:uint):void {}
     }
 }
