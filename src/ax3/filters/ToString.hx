@@ -8,6 +8,10 @@ class ToString extends AbstractFilter {
 	override function processExpr(e:TExpr):TExpr {
 		e = mapExpr(processExpr, e);
 		return switch e.kind {
+			case TECall({kind: TEField({kind: TOExplicit(_, eValue = {type: t})}, "toString", _)}, args = {args: []}) if (shouldRewriteInstToString(t)):
+				var eStdString = mkBuiltin("Std.string", tStdString, removeLeadingTrivia(eValue));
+				e.with(kind = TECall(eStdString, args.with(args = [{expr: eValue, comma: null}])));
+
 			case TECall({kind: TEField({kind: TOExplicit(_, eValue = {type: TTInt | TTUint | TTNumber | TTBoolean | TTAny | TTObject(_)})}, "toString", _)}, args = {args: []}):
 				var eStdString = mkBuiltin("Std.string", tStdString, removeLeadingTrivia(eValue));
 				e.with(kind = TECall(eStdString, args.with(args = [{expr: eValue, comma: null}])));
@@ -52,6 +56,15 @@ class ToString extends AbstractFilter {
 					case _:
 						e;
 				}
+		}
+	}
+
+	static function shouldRewriteInstToString(t:TType):Bool {
+		return switch t {
+			case TTInst(cls):
+				cls.findFieldInHierarchy("toString", false) == null;
+			case _:
+				false;
 		}
 	}
 
