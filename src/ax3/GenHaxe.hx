@@ -925,9 +925,20 @@ class GenHaxe extends PrinterBase {
 		} else {
 			buf.add(":");
 		}
-		printTType(hint.type);
+		if (hint.syntax != null && hint.type == TTAny && isDynamicSyntax(hint.syntax.type)) {
+			buf.add("Dynamic");
+		} else {
+			printTType(hint.type);
+		}
 		if (hint.syntax != null) {
 			printTrivia(ParseTree.getSyntaxTypeTrailingTrivia(hint.syntax.type));
+		}
+	}
+
+	static function isDynamicSyntax(t:SyntaxType):Bool {
+		return switch t {
+			case TPath(path): ParseTree.dotPathToString(path) == "Dynamic";
+			case _: false;
 		}
 	}
 

@@ -77,6 +77,7 @@ class Filters {
 			new VarInits(context),
 			new UintComparison(context),
 			new HandleProtectedOverrides(context),
+			new FixOverrides(context),
 			new CheckUntypedMethodCalls(context),
 			new RemoveRedundantParenthesis(context),
 			new FixImports(context)
