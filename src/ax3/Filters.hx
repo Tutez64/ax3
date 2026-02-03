@@ -75,6 +75,7 @@ class Filters {
 			new NamespacedToPublic(context),
 			new HoistLocalDecls(context),
 			new VarInits(context),
+			new FixVoidReturn(context),
 			new UintComparison(context),
 			new HandleProtectedOverrides(context),
 			new FixOverrides(context),
