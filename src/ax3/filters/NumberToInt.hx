@@ -6,9 +6,14 @@ class NumberToInt extends AbstractFilter {
 	override function processExpr(e:TExpr):TExpr {
 		e = mapExpr(processExpr, e);
 		return switch [e.type, e.expectedType] {
-			case [TTNumber, TTInt | TTUint]:
+			case [TTNumber, TTInt]:
 				var stdInt = mkBuiltin("Std.int", tStdInt, removeLeadingTrivia(e));
-				mkCall(stdInt, [e.with(expectedType = TTNumber)]);
+				mkCall(stdInt, [e.with(expectedType = TTNumber)], TTInt, removeTrailingTrivia(e));
+
+			case [TTNumber, TTUint]:
+				var stdInt = mkBuiltin("Std.int", tStdInt, removeLeadingTrivia(e));
+				var call = mkCall(stdInt, [e.with(expectedType = TTNumber)], TTInt, removeTrailingTrivia(e));
+				mk(TEHaxeRetype(call), TTUint, TTUint);
 			case _:
 				e;
 		}

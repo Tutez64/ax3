@@ -16,11 +16,16 @@ class CoerceToBool extends AbstractFilter {
 	static final tStringAsBool = TTFun([TTString], TTBoolean);
 	static final tFloatAsBool = TTFun([TTNumber], TTBoolean);
 	static final tIntAsBool = TTFun([TTInt], TTBoolean);
+	static final tToBool = TTFun([TTAny], TTBoolean);
 
 	public function coerce(e:TExpr):TExpr {
-		if (e.kind.match(TEBinop(_, OpAnd(_) | OpOr(_), _))) {
-			// inner expressions are already coerced, so we just need to fix the type for the binop
-			return e.with(type = TTBoolean);
+		switch e.kind {
+			case TEBinop(a, op = OpAnd(_) | OpOr(_), b):
+				// ensure both sides are coerced to bool when the overall expression is used as bool
+				var a2 = if (a.type == TTBoolean) a else coerce(a.with(expectedType = TTBoolean));
+				var b2 = if (b.type == TTBoolean) b else coerce(b.with(expectedType = TTBoolean));
+				return e.with(kind = TEBinop(a2, op, b2), type = TTBoolean);
+			case _:
 		}
 
 		return switch (e.type) {
@@ -76,7 +81,14 @@ class CoerceToBool extends AbstractFilter {
 				}), TTBoolean, TTBoolean);
 
 			case TTAny | TTObject(_):
-				e.with(expectedType = e.type); // handled at run-time by the ASAny/ASObject abstract \o/
+				var lead = removeLeadingTrivia(e);
+				var tail = removeTrailingTrivia(e);
+				var eToBoolMethod = mkBuiltin("ASCompat.toBool", tToBool, lead, []);
+				mk(TECall(eToBoolMethod, {
+					openParen: mkOpenParen(),
+					closeParen: mkCloseParen(tail),
+					args: [{expr: e.with(expectedType = e.type), comma: null}],
+				}), TTBoolean, TTBoolean);
 
 			case TTVoid:
 				throwError(exprPos(e), "void used as Bool?");

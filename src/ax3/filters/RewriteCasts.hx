@@ -21,7 +21,7 @@ class RewriteCasts extends AbstractFilter {
 
 				switch [expr.type, castType] {
 					// int(number)
-					case [TTNumber, TTInt | TTUint]:
+					case [TTNumber, TTInt]:
 						var stdInt = mkBuiltin("Std.int", tStdInt, removeLeadingTrivia(e));
 						e.with(kind = TECall(stdInt, {
 							openParen: syntax.openParen,
@@ -29,12 +29,30 @@ class RewriteCasts extends AbstractFilter {
 							closeParen: syntax.closeParen
 						}));
 
+					// uint(number)
+					case [TTNumber, TTUint]:
+						var stdInt = mkBuiltin("Std.int", tStdInt, removeLeadingTrivia(e));
+						var call = e.with(kind = TECall(stdInt, {
+							openParen: syntax.openParen,
+							args: [{expr: expr, comma: null}],
+							closeParen: syntax.closeParen
+						}), type = TTInt, expectedType = TTInt);
+						mk(TEHaxeRetype(call), TTUint, TTUint);
+
 					// int(already an int)
-					case [TTInt | TTUint, TTInt | TTUint]:
+					case [TTInt | TTUint, TTInt]:
 						stripCast();
 
+					// uint(already an uint)
+					case [TTUint, TTUint]:
+						stripCast();
+
+					// uint(from int)
+					case [TTInt, TTUint]:
+						mk(TEHaxeRetype(stripCast()), TTUint, TTUint);
+
 					// int(other)
-					case [_, TTInt | TTUint]:
+					case [_, TTInt]:
 						expr = maybeCoerceToString(expr);
 						var eCastMethod = mkBuiltin("ASCompat.toInt", tToInt, removeLeadingTrivia(e));
 						e.with(kind = TECall(eCastMethod, {
@@ -42,6 +60,17 @@ class RewriteCasts extends AbstractFilter {
 							args: [{expr: expr, comma: null}],
 							closeParen: syntax.closeParen
 						}));
+
+					// uint(other)
+					case [_, TTUint]:
+						expr = maybeCoerceToString(expr);
+						var eCastMethod = mkBuiltin("ASCompat.toInt", tToInt, removeLeadingTrivia(e));
+						var call = e.with(kind = TECall(eCastMethod, {
+							openParen: syntax.openParen,
+							args: [{expr: expr, comma: null}],
+							closeParen: syntax.closeParen
+						}), type = TTInt, expectedType = TTInt);
+						mk(TEHaxeRetype(call), TTUint, TTUint);
 
 					// Number(already a number)
 					case [TTNumber | TTInt | TTUint, TTNumber]:

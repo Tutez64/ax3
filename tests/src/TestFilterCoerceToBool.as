@@ -15,6 +15,8 @@ package {
             if (str) {}
             if (num) {}
             if (arr) {}
+            if (obj && str) {}
+            if (str && num) {}
 
             var b:Boolean = obj ? true : false;
 
