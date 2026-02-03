@@ -3,6 +3,14 @@ package ax3.filters;
 class MathApi extends AbstractFilter {
 	override function processExpr(e:TExpr):TExpr {
 		return switch e.kind {
+			case TECall({kind: TEField({kind: TOExplicit(_, {kind: TEBuiltin(builtinToken, "Float" | "Number")})}, fieldName = "min" | "max", _)}, args):
+				args = mapCallArgs(processExpr, args);
+				var mathDecl = tree.getDecl("", "Math");
+				var mathToken = mkIdent("Math", removeLeadingTrivia(e), []);
+				var eMath = mkDeclRef({first: mathToken, rest: []}, mathDecl, TTAny);
+				var eMethod = mk(TEField({kind: TOExplicit(mkDot(), eMath), type: eMath.type}, fieldName, mkIdent(fieldName)), TTFunction, TTFunction);
+				mkCall(eMethod, [for (arg in args.args) arg.expr], TTNumber, removeTrailingTrivia(e));
+
 			case TECall(
 					eMethod = {
 						kind: TEField(
