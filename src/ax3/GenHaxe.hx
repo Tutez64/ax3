@@ -794,7 +794,7 @@ class GenHaxe extends PrinterBase {
 				case TArgRest(dots, _, hint):
 					#if (haxe_ver >= 4.20)
 					printTextWithTrivia('...' + arg.name, arg.syntax.name);
-					printTypeHint({type: arg.type, syntax: hint});
+					printTypeHint({type: restElementType(arg.type), syntax: hint});
 					#else
 					throwError(dots.pos, "Unprocessed rest arguments");
 					#end
@@ -810,6 +810,13 @@ class GenHaxe extends PrinterBase {
 				}
 			case _:
 				printTypeHint(sig.ret);
+		}
+	}
+
+	static function restElementType(t:TType):TType {
+		return switch t {
+			case TTArray(elem): elem;
+			case _: t;
 		}
 	}
 

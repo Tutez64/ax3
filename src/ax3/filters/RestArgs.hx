@@ -55,34 +55,16 @@ class RestArgs extends AbstractFilter {
 						fun.expr = concatExprs(eArrayInit, fun.expr);
 					}
 					#else
-					if (typeHint != null) {
-						typeHint.type = TPath({first: new Token(0, TkIdent, "ASAny", [], []), rest: []});
-						lastArg.type = TTAny;
-					}
-					if (fun.expr != null) {
-						final argLocal = mk(
-							TELocal(mkIdent(lastArg.name), lastArg.v),
-							TTArray(TTAny),
-							TTArray(TTAny)
-						);
-						final e = mk(TEBinop(
-							{
-								kind: TEVars(VConst(new Token(0, TkIdent, '', [], [whitespace])), [{
-									v: {name: lastArg.name, type: TTArray(TTAny)},
-									syntax: {
-										name: mkIdent(lastArg.name),
-										type: typeHint
-									},
-									init: null,
-									comma: null
-								}]),
-								type: TTArray(TTAny),
-								expectedType: TTArray(TTAny)
-							},
-							OpAssign(new Token(0, TkEquals, "=", [whitespace], [whitespace])),
-							argLocal
-						), TTArray(TTAny), TTArray(TTAny));
-						fun.expr = concatExprs(e, fun.expr);
+					if (fun.expr != null && lastArg.v != null) {
+						var originalName = lastArg.name;
+						var paramVar = lastArg.v;
+						var newParamName = makeUniqueParamName(originalName, fun.sig.args);
+						if (newParamName != originalName) {
+							renameArg(lastArg, newParamName);
+						}
+						var arrayVar:TVar = {name: originalName, type: tUntypedArray};
+						fun.expr = replaceLocalVar(fun.expr, paramVar, arrayVar);
+						fun.expr = injectRestArrayDecl(fun.expr, arrayVar, originalName, paramVar);
 					}
 					#end
 			}
@@ -119,6 +101,101 @@ class RestArgs extends AbstractFilter {
 		}
 
 		return e;
+	}
+
+	static function renameArg(arg:TFunctionArg, newName:String) {
+		arg.name = newName;
+		if (arg.v != null) {
+			arg.v.name = newName;
+		}
+		var newToken = mkIdent(newName);
+		newToken.leadTrivia = arg.syntax.name.leadTrivia;
+		newToken.trailTrivia = arg.syntax.name.trailTrivia;
+		arg.syntax.name = newToken;
+	}
+
+	static function makeUniqueParamName(base:String, args:Array<TFunctionArg>):String {
+		var used = new Map<String, Bool>();
+		for (arg in args) {
+			used.set(arg.name, true);
+		}
+		var name = "_" + base;
+		while (used.exists(name)) {
+			name = "_" + name;
+		}
+		return name;
+	}
+
+	static function replaceLocalVar(expr:TExpr, from:TVar, to:TVar):TExpr {
+		var mapped = mapExpr(e -> replaceLocalVar(e, from, to), expr);
+		return switch mapped.kind {
+			case TELocal(token, v) if (v == from):
+				var newToken = mkIdent(to.name);
+				newToken.leadTrivia = token.leadTrivia;
+				newToken.trailTrivia = token.trailTrivia;
+				mapped.with(kind = TELocal(newToken, to), type = to.type);
+			case _:
+				mapped;
+		}
+	}
+
+	static function injectRestArrayDecl(expr:TExpr, arrayVar:TVar, arrayName:String, paramVar:TVar):TExpr {
+		return switch expr.kind {
+			case TEBlock(block):
+				var initExpr = buildRestArrayInit(paramVar);
+				var lead =
+					if (block.exprs.length > 0)
+						removeLeadingTrivia(block.exprs[0].expr)
+					else
+						[newline, whitespace];
+				if (block.exprs.length > 0) {
+					var indent = extractIndent(lead);
+					processLeadingToken(t -> t.leadTrivia = cloneTrivia(indent).concat(t.leadTrivia), block.exprs[0].expr);
+				}
+				var varToken = mkIdent("var", lead, [whitespace]);
+				var decl:TVarDecl = {
+					syntax: {name: mkIdent(arrayName), type: null},
+					v: arrayVar,
+					init: {
+						equalsToken: mkTokenWithSpaces(TkEquals, "="),
+						expr: initExpr
+					},
+					comma: null
+				};
+				var declExpr = mk(TEVars(VVar(varToken), [decl]), TTVoid, TTVoid);
+				var newExprs = [{expr: declExpr, semicolon: addTrailingNewline(mkSemicolon())}].concat(block.exprs);
+				expr.with(kind = TEBlock(block.with(exprs = newExprs)));
+			case _:
+				expr;
+		}
+	}
+
+	static function buildRestArrayInit(paramVar:TVar):TExpr {
+		var paramLocal = mk(TELocal(mkIdent(paramVar.name), paramVar), paramVar.type, paramVar.type);
+		var field = mk(TEField({kind: TOExplicit(mkDot(), paramLocal), type: paramLocal.type}, "toArray", mkIdent("toArray")), TTFunction, TTFunction);
+		return mk(TECall(field, {
+			openParen: mkOpenParen(),
+			args: [],
+			closeParen: mkCloseParen()
+		}), tUntypedArray, tUntypedArray);
+	}
+
+	static function extractIndent(trivia:Array<Trivia>):Array<Trivia> {
+		var result:Array<Trivia> = [];
+		for (item in trivia) {
+			switch item.kind {
+				case TrWhitespace:
+					result.push(item);
+				case TrNewline:
+					result = [];
+				case _:
+			}
+		}
+		return result;
+	}
+
+	static function cloneTrivia(trivia:Array<Trivia>):Array<Trivia> {
+		return [for (item in trivia) new Trivia(item.kind, item.text)];
 	}
 
 	static function keepRestCall(callable:TExpr):Bool {
