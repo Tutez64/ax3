@@ -75,6 +75,7 @@ class Filters {
 			new ToString(context),
 			new CoerceFromAny(context),
 			new NamespacedToPublic(context),
+			new MoveFieldInits(context),
 			new HoistLocalDecls(context),
 			new VarInits(context),
 			new FixVoidReturn(context),
