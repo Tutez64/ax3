@@ -266,6 +266,12 @@ class ASCompat {
 
 	public static inline function textFieldGetXMLText(field:flash.text.TextField, ?beginIndex:Int, ?endIndex:Int):String {
 		#if flash
+		if (beginIndex == null) {
+			return untyped field.getXMLText();
+		}
+		if (endIndex == null) {
+			return untyped field.getXMLText(beginIndex);
+		}
 		return untyped field.getXMLText(beginIndex, endIndex);
 		#else
 		var text = field.text;

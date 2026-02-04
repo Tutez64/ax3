@@ -116,6 +116,20 @@ class ASArray {
 
 	static function makeMultipleAppend(methodName:String, object:Expr, firstValue:Expr, rest:Array<Expr>):Expr {
 		var pos = Context.currentPos();
+		if (methodName == "unshift") {
+			var values:Array<Expr> = [firstValue];
+			values = values.concat(rest);
+			return macro @:pos(pos) {
+				var ___arr = $object;
+				var ___vals = $a{values};
+				var ___i = ___vals.length - 1;
+				while (___i >= 0) {
+					___arr.unshift(___vals[___i]);
+					___i--;
+				}
+				___arr.length;
+			};
+		}
 		var exprs = [macro @:pos(pos) ___arr.$methodName($firstValue)];
 		for (expr in rest) {
 			exprs.push(macro @:pos(pos) ___arr.$methodName($expr));
@@ -123,6 +137,7 @@ class ASArray {
 		return macro @:pos(pos) {
 			var ___arr = $object;
 			$b{exprs};
+			___arr.length;
 		};
 	}
 }

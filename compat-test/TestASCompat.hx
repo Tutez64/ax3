@@ -70,6 +70,93 @@ class TestASCompat extends utest.Test {
 		equals(2, indices[2]);
 	}
 
+	function testArrayReverseMapSomeSort() {
+		var reversed = [1, 2, 3];
+		var reversedResult = ASCompat.ASArray.reverse(reversed);
+		isTrue(reversedResult == reversed);
+		equals(3, reversed[0]);
+		equals(1, reversed[2]);
+
+		var values = [1, 2, 3];
+		var ctx = new TestASCompatSumCtx();
+		var found = ASCompat.ASArray.some(values, ctx.test, ctx);
+		isTrue(found);
+		equals(3, ctx.sum);
+
+		var mapped = ASCompat.ASArray.map(values, function(value:Int, index:Int, array:Array<Int>):Int {
+			return value * 2;
+		});
+		equals(3, mapped.length);
+		equals(2, mapped[0]);
+		equals(6, mapped[2]);
+
+		var sortable = [3, 1, 2];
+		ASCompat.ASArray.sort(sortable, function(a:Int, b:Int):Dynamic {
+			return (a > b) ? 1.0 : -1.0;
+		});
+		equals(1, sortable[0]);
+		equals(3, sortable[2]);
+	}
+
+	function testArrayPushUnshiftMultiple() {
+		var items = [1];
+		var len = ASCompat.ASArray.pushMultiple(items, 2, 3, 4);
+		equals(4, len);
+		equals(4, items[3]);
+
+		len = ASCompat.ASArray.unshiftMultiple(items, -1, -2);
+		equals(6, len);
+		equals(-1, items[0]);
+		equals(-2, items[1]);
+	}
+
+	function testArraySpliceHelpers() {
+		var items = [1, 2, 3, 4];
+		var newLen = ASCompat.arraySetLength(items, 2);
+		equals(2, newLen);
+		equals(2, items.length);
+
+		items = [1, 2, 3, 4];
+		var removedAll = ASCompat.arraySpliceAll(items, 2);
+		equals(2, removedAll.length);
+		equals(3, removedAll[0]);
+		equals(2, items.length);
+
+		items = [1, 2, 3];
+		var removed = ASCompat.arraySplice(items, 1, 1, [9, 8]);
+		equals(1, removed.length);
+		equals(2, removed[0]);
+		equals(4, items.length);
+		equals(1, items[0]);
+		equals(9, items[1]);
+		equals(8, items[2]);
+		equals(3, items[3]);
+	}
+
+	function testVectorCompatHelpers() {
+		var v = new flash.Vector<Int>();
+		v.push(1);
+		v.push(2);
+		v.push(3);
+
+		ASCompat.ASVector.reverse(v);
+		equals(3, v[0]);
+		equals(1, v[2]);
+
+		var mapped = ASCompat.ASVector.map(v, function(value:Int, index:Int, vector:flash.Vector<Int>):Int {
+			return value + 1;
+		});
+		equals(3, mapped.length);
+		equals(4, mapped[0]);
+		equals(2, mapped[2]);
+
+		ASCompat.ASVector.sort(v, function(a:Int, b:Int):Dynamic {
+			return (a > b) ? 1.0 : -1.0;
+		});
+		equals(1, v[0]);
+		equals(3, v[2]);
+	}
+
 	function testFilterXmlList() {
 		var x = new compat.XML('<root><a id="1"/><b/><a id="2"/></root>');
 		var list = x.children();
@@ -81,6 +168,17 @@ class TestASCompat extends utest.Test {
 		var x = new compat.XML("<root/>");
 		var list = ASCompat.xmlToList(x);
 		equals("<root/>", list.toXMLString());
+	}
+
+	function testTextFieldGetXMLText() {
+		var field = new flash.text.TextField();
+		field.text = "abcd";
+		#if flash
+		var xml = ASCompat.textFieldGetXMLText(field);
+		isTrue(xml.indexOf("abcd") != -1);
+		#else
+		equals("bc", ASCompat.textFieldGetXMLText(field, 1, 3));
+		#end
 	}
 
 	function testTypeof() {
@@ -150,5 +248,16 @@ class TestASCompat extends utest.Test {
 		#else
 		isTrue(utcValue >= 0 || utcValue <= 0);
 		#end
+	}
+}
+
+private class TestASCompatSumCtx {
+	public var sum:Int = 0;
+
+	public function new() {}
+
+	public function test(value:Int, index:Int, array:Array<Int>):Bool {
+		sum += value;
+		return value == 2;
 	}
 }
