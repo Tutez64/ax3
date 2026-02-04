@@ -56,6 +56,7 @@ class Filters {
 			new NumberToInt(context),
 			new CoerceToNumber(context),
 			new RewriteCasts(context),
+			new RewriteClassCast(context),
 			new HandleBasicValueDictionaryLookups(context),
 			coerceToBool,
 			new RewriteNonBoolOr(context, coerceToBool),
