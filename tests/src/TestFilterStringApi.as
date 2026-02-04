@@ -20,8 +20,11 @@ package {
             lower = upper.toLocaleLowerCase();
 
             var sliceText:String = lower.slice(1, 3);
+            var sliceAll:String = lower.slice();
             var concatText:String = "a".concat("b", 1, true);
             var compareValue:int = "a".localeCompare("b");
+            var substrAll:String = lower.substr();
+            var substringAll:String = lower.substring();
 
             var regText:String = "aa bb aa";
             var regMatch:Array = regText.match(/a+/g);
@@ -35,6 +38,10 @@ package {
             regText = regText.replace("x", 42);
             regText = regText.replace("y", false);
             regText = regText.replace("z", null);
+
+            if (sliceAll == null || substrAll == null || substringAll == null || concatText == null || compareValue == 0) {
+                trace(sliceAll, substrAll, substringAll, concatText, compareValue);
+            }
         }
     }
 }

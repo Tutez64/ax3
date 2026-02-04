@@ -11,6 +11,21 @@ class StringApi extends AbstractFilter {
 
 	override function processExpr(e:TExpr):TExpr {
 		return switch e.kind {
+			case TECall(eMethod = {kind: TEField(fieldObject = {kind: TOExplicit(dot, eString = {type: TTString})}, methodName = "substring" | "substr" | "slice", fieldToken)}, args):
+				eString = processExpr(eString);
+				args = mapCallArgs(processExpr, args);
+				var renamed = methodName == "slice";
+				if (renamed) {
+					methodName = "substring";
+					fieldToken = new Token(fieldToken.pos, TkIdent, methodName, fieldToken.leadTrivia, fieldToken.trailTrivia);
+					eMethod = eMethod.with(kind = TEField(fieldObject, methodName, fieldToken));
+				}
+				if (args.args.length == 0) {
+					var zeroExpr = mk(TELiteral(TLInt(new Token(0, TkDecimalInteger, "0", [], []))), TTInt, TTInt);
+					args = args.with(args = [{expr: zeroExpr, comma: null}]);
+				}
+				e.with(kind = TECall(eMethod, args));
+
 			case TECall({kind: TEField({kind: TOExplicit(dot, eString = {type: TTString})}, "replace", replaceToken)}, args):
 				eString = processExpr(eString);
 				args = mapCallArgs(processExpr, args);
