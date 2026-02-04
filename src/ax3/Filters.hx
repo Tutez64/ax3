@@ -70,6 +70,7 @@ class Filters {
 			new ApiSignatureOverrides(context),
 			new ArrayApi(context),
 			new StringApi(context),
+			new TextFieldApi(context),
 			new NumberApi(context),
 			new RewriteArguments(context),
 			new FunctionApply(context),
