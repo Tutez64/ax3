@@ -4,6 +4,7 @@
  * sort uses Reflect.compare for statements and ASCompat.ASArray.sort for value usage.
  * sort options route to ASCompat.ASArray.sortWithOptions.
  * concat/join/push/unshift/length/insertAt/splice are rewritten as needed.
+ * reverse/map/some route to compat helpers for Array/Vector.
  * untyped concat arguments should report a non-blocking error.
  * Vector sort/splice paths are covered.
  */
@@ -34,6 +35,17 @@ package {
 
             var joined:String = items.join();
 
+            items.reverse();
+            items = items.reverse();
+
+            var anyFound:Boolean = items.some(function(item:*, index:int, array:Array):Boolean {
+                return item != null;
+            }, this);
+
+            var mapped:Array = items.map(function(item:*, index:int, array:Array):* {
+                return item;
+            }, this);
+
             var newLen:int = items.push(1, 2);
             items.unshift(3, 4);
 
@@ -59,6 +71,14 @@ package {
             vec.splice(0, 0, 5);
             vec.splice(1);
             vec.splice(1, 2, 3, 4);
+
+            var vec2:Vector.<int> = new Vector.<int>();
+            vec2.push(1);
+            vec2.reverse();
+            vec2 = vec2.reverse();
+            var mappedVec:Vector.<int> = vec2.map(function(item:int, index:int, vector:Vector.<int>):int {
+                return item + 1;
+            }, this);
         }
     }
 }

@@ -9,6 +9,37 @@ class ArrayApi extends AbstractFilter {
 	override function processExpr(e:TExpr):TExpr {
 		e = mapExpr(processExpr, e);
 		return switch e.kind {
+			// slice with no args (Array/Vector) -> slice(0)
+			case TECall({kind: TEField(fieldObj = {kind: TOExplicit(dot, eArray = {type: TTArray(_) | TTVector(_)})}, "slice", _)}, args) if (args.args.length == 0):
+				var zeroExpr = mk(TELiteral(TLInt(new Token(0, TkDecimalInteger, "0", [], []))), TTInt, TTInt);
+				var newArgs = args.with(args = [{expr: zeroExpr, comma: null}]);
+				e.with(kind = TECall(mk(TEField(fieldObj, "slice", mkIdent("slice")), TTFunction, TTFunction), newArgs));
+
+			// reverse (Array/Vector)
+			case TECall({kind: TEField({kind: TOExplicit(dot, eArray = {type: TTArray(_) | TTVector(_)})}, "reverse", _)}, args) if (args.args.length == 0):
+				var isVector = eArray.type.match(TTVector(_));
+				var compatName = if (isVector) "ASCompat.ASVector" else "ASCompat.ASArray";
+				var eCompat = mkBuiltin(compatName, TTBuiltin, removeLeadingTrivia(eArray));
+				var fieldObj = {kind: TOExplicit(mkDot(), eCompat), type: eCompat.type};
+				var eMethod = mk(TEField(fieldObj, "reverse", mkIdent("reverse")), TTFunction, TTFunction);
+				e.with(kind = TECall(eMethod, args.with(args = [{expr: eArray, comma: null}])));
+
+			// Array.some -> ASCompat.ASArray.some
+			case TECall({kind: TEField({kind: TOExplicit(dot, eArray = {type: TTArray(_)})}, "some", _)}, args):
+				var eCompatArray = mkBuiltin("ASCompat.ASArray", TTBuiltin, removeLeadingTrivia(eArray));
+				var fieldObj = {kind: TOExplicit(mkDot(), eCompatArray), type: eCompatArray.type};
+				var eMethod = mk(TEField(fieldObj, "some", mkIdent("some")), TTFunction, TTFunction);
+				e.with(kind = TECall(eMethod, args.with(args = [{expr: eArray, comma: commaWithSpace}].concat(args.args))));
+
+			// Array.map / Vector.map -> compat (preserve AS3 callback signature + thisArg)
+			case TECall({kind: TEField({kind: TOExplicit(dot, eArr = {type: TTArray(_) | TTVector(_)})}, "map", _)}, args):
+				var isVector = eArr.type.match(TTVector(_));
+				var compatName = if (isVector) "ASCompat.ASVector" else "ASCompat.ASArray";
+				var eCompat = mkBuiltin(compatName, TTBuiltin, removeLeadingTrivia(eArr));
+				var fieldObj = {kind: TOExplicit(mkDot(), eCompat), type: eCompat.type};
+				var eMethod = mk(TEField(fieldObj, "map", mkIdent("map")), TTFunction, TTFunction);
+				e.with(kind = TECall(eMethod, args.with(args = [{expr: eArr, comma: commaWithSpace}].concat(args.args))));
+
 			// sort constants
 			case TEField({kind: TOExplicit(dot, {kind: TEBuiltin(arrayToken, "Array")})}, fieldName = "CASEINSENSITIVE" | "DESCENDING" | "NUMERIC" | "RETURNINDEXEDARRAY" | "UNIQUESORT", fieldToken):
 				var eCompatArray = mkBuiltin("ASCompat.ASArray", TTBuiltin, arrayToken.leadTrivia, arrayToken.trailTrivia);
@@ -60,19 +91,12 @@ class ArrayApi extends AbstractFilter {
 						}
 
 					case [{expr: {type: TTFunction | TTFun(_)}}]:
-						if (e.expectedType != TTVoid) {
-							// method used in a value place. AS3 API modifies the vector inplace, but still returns itself
-							// for Haxe we could generate `{ expr.sort(); expr; }`, but since `expr` can be a complex
-							// expression with possible side-effects, let's just keep it simple and call an ASCompat method
-							var eCompatVector = mkBuiltin("ASCompat.AS" + kind, TTBuiltin, removeLeadingTrivia(eVector));
-							e.with(kind = TECall(
-								mk(TEField({kind: TOExplicit(dot, eCompatVector), type: eCompatVector.type}, "sort", mkIdent("sort")), TTFunction, TTFunction),
-								args.with(args = [{expr: eVector, comma: commaWithSpace}, args.args[0]])
-							));
-						} else {
-							// supported by Haxe directly
-							e;
-						}
+						// Always route through compat to allow comparator return values that are not Int.
+						var eCompatVector = mkBuiltin("ASCompat.AS" + kind, TTBuiltin, removeLeadingTrivia(eVector));
+						e.with(kind = TECall(
+							mk(TEField({kind: TOExplicit(dot, eCompatVector), type: eCompatVector.type}, "sort", mkIdent("sort")), TTFunction, TTFunction),
+							args.with(args = [{expr: eVector, comma: commaWithSpace}, args.args[0]])
+						));
 
 					case [eOptions = {expr: {type: TTInt | TTUint}}]:
 						var eCompatVector = mkBuiltin("ASCompat.AS" + kind, TTBuiltin, removeLeadingTrivia(eVector));
