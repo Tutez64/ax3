@@ -43,6 +43,9 @@ class HaxeProperties extends AbstractFilter {
 		} else {
 			prop.syntax.leadTrivia = prop.syntax.leadTrivia.concat(leadTrivia);
 			prop.metadata = prop.metadata.concat(metadata);
+			if (isAnyLike(prop.type) && !isAnyLike(type)) {
+				prop.type = type;
+			}
 		}
 
 		if (set) prop.set = true else prop.get = true;
@@ -56,6 +59,10 @@ class HaxeProperties extends AbstractFilter {
 		}
 
 		return if (isNewProperty) prop else null;
+	}
+
+	static inline function isAnyLike(t:TType):Bool {
+		return t.match(TTAny | TTObject(TTAny));
 	}
 
 	function getMods(f:TClassField):Modifiers {
@@ -123,12 +130,16 @@ class HaxeProperties extends AbstractFilter {
 	}
 
 	function processGetter(field:TClassField, accessor:TAccessorField, mods:Modifiers, leadToken:Token) {
-		var shouldCreateProperty = !mods.isOverride && !hasAccessorInSuper(accessor.name);
+		var hasSuperSetter = hasSetterInSuper(accessor.name);
+		var shouldCreateProperty = !hasAnyAccessorInSuper(accessor.name);
 		if (shouldCreateProperty) {
 			removePublicModifier(field);
 			var prop = addProperty(accessor.name, false, accessor.fun.sig.ret.type, mods, leadToken, removeMetadata(field));
 			if (prop != null) {
 				accessor.haxeProperty = prop;
+				if (hasSuperSetter) {
+					prop.set = true;
+				}
 				if (isImplementingExternProperty(currentClass, accessor.name, true)) {
 					// if we implement a property from an swc, we gotta mark with with @:flash.property metadata
 					// so actual Flash accessor is generated for it by Haxe
@@ -147,7 +158,8 @@ class HaxeProperties extends AbstractFilter {
 			syntax: null
 		};
 
-		var shouldCreateProperty = !mods.isOverride && !hasAccessorInSuper(accessor.name);
+		var hasSuperGetter = hasGetterInSuper(accessor.name);
+		var shouldCreateProperty = !hasAnyAccessorInSuper(accessor.name);
 		if (shouldCreateProperty) {
 			removePublicModifier(field);
 		}
@@ -205,6 +217,9 @@ class HaxeProperties extends AbstractFilter {
 			var prop = addProperty(accessor.name, true, type, mods, leadToken, removeMetadata(field));
 			if (prop != null) {
 				accessor.haxeProperty = prop;
+				if (hasSuperGetter) {
+					prop.get = true;
+				}
 				if (isImplementingExternProperty(currentClass, accessor.name, false)) {
 					// if we implement a property from an swc, we gotta mark with with @:flash.property metadata
 					// so actual Flash accessor is generated for it by Haxe
@@ -220,16 +235,28 @@ class HaxeProperties extends AbstractFilter {
 		return result;
 	}
 
-	function hasAccessorInSuper(name:String):Bool {
+	function hasGetterInSuper(name:String):Bool {
+		return hasAccessorInSuper(name, false);
+	}
+
+	function hasSetterInSuper(name:String):Bool {
+		return hasAccessorInSuper(name, true);
+	}
+
+	function hasAnyAccessorInSuper(name:String):Bool {
+		return hasGetterInSuper(name) || hasSetterInSuper(name);
+	}
+
+	function hasAccessorInSuper(name:String, wantSetter:Bool):Bool {
 		var superClass = getSuperClass(currentClass);
 		while (superClass != null) {
 			for (member in superClass.members) {
 				switch member {
 					case TMField(f) if (!TypedTreeTools.isFieldStatic(f)):
 						switch f.kind {
-							case TFGetter(a) if (a.name == name):
+							case TFGetter(a) if (!wantSetter && a.name == name):
 								return true;
-							case TFSetter(a) if (a.name == name):
+							case TFSetter(a) if (wantSetter && a.name == name):
 								return true;
 							case _:
 						}
