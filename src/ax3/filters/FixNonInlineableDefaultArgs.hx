@@ -45,6 +45,8 @@ class FixNonInlineableDefaultArgs extends AbstractFilter {
 		return switch e.kind {
 			case TEParens(_, e2, _):
 				isConstantExpr(e2);
+			case TEHaxeRetype(e2):
+				isConstantExpr(e2);
 
 			case TEField(obj, fieldName, _):
 				switch obj.type {

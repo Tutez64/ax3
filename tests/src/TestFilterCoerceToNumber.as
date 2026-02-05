@@ -25,9 +25,19 @@ package {
             var i4:int = f;
             var u4:uint = f;
 
+            var b2:Boolean = false;
+            var cmp1:Boolean = b2 > 1;
+            var cmp2:Boolean = 2 < b2;
+            var cmp3:Boolean = b2 >= 0;
+            var cmp4:Boolean = 0 <= b2;
+
             takesInt(any);
             takesUInt(any);
             takesNumber(any);
+
+            if (cmp1 || cmp2 || cmp3 || cmp4) {
+                trace(cmp1, cmp2, cmp3, cmp4);
+            }
         }
 
         private function takesInt(v:int):void {}

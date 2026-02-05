@@ -69,6 +69,12 @@ package {
             var arr2:Array = [];
             var val2 = arr2[idx]; // idx used as index
             // idx should be Int
+
+            // Case 8b: Object key access should not force Int
+            var key:*;
+            var obj:Object = {};
+            var valObj = obj[key];
+            // key should remain ASAny/String-like
             
             // Case 9: Array Literal Inference
             var arrVar:*;

@@ -21,7 +21,10 @@ class RewriteArrayAccess extends AbstractFilter {
 
 					case [TTInst({name: "ByteArray", parentModule: {parentPack: {name: "flash.utils"}}}), TTInt | TTUint | TTNumber]
 					   :
-						if (eindex.type == TTNumber) reportError(exprPos(e), "ByteArray access using Number index");
+						if (eindex.type == TTNumber) {
+							reportError(exprPos(e), "ByteArray access using Number index");
+							eindex = eindex.with(expectedType = TTInt);
+						}
 						e.with(kind = TEArrayAccess(a.with(eobj = eobj, eindex = eindex)), type = TTUint);
 
 					case [TTArray(_), TTString]:

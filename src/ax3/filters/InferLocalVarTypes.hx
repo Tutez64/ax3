@@ -197,8 +197,19 @@ class InferLocalVarTypes extends AbstractFilter {
 					loop(b);
 				
 				case TEArrayAccess(a):
-					// Index usage implies Int
-					checkUsage(a.eindex, TTInt);
+					// Index usage implies Int only for Array/Vector/XMLList/ByteArray.
+					// For Object/Any, avoid forcing Int (keys are usually strings).
+					switch a.eobj.type {
+						case TTArray(_) | TTVector(_) | TTXMLList:
+							checkUsage(a.eindex, TTInt);
+						case TTInst({name: "ByteArray", parentModule: {parentPack: {name: "flash.utils"}}}):
+							checkUsage(a.eindex, TTInt);
+						case TTDictionary(keyType, _):
+							if (!keyType.match(TTAny | TTObject(TTAny))) {
+								checkUsage(a.eindex, keyType);
+							}
+						case _:
+					}
 					loop(a.eobj);
 					loop(a.eindex);
 					
