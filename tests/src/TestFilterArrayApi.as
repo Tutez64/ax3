@@ -48,6 +48,8 @@ package {
 
             var newLen:int = items.push(1, 2);
             items.unshift(3, 4);
+            items.push();
+            items.unshift();
 
             items.length = 1;
             var len:int = (items.length = 2);

@@ -150,6 +150,18 @@ class ArrayApi extends AbstractFilter {
 				var eMethod = mk(TEField(fieldObj, methodName + "Multiple", fieldToken), TTFunction, TTFunction);
 				e.with(kind = TECall(eMethod, args.with(args = [{expr: eArray, comma: commaWithSpace}].concat(args.args))));
 
+			// push/unshift with no arguments -> no-op, return length
+			case TECall({kind: TEField({kind: TOExplicit(dot, eArray = {type: TTArray(_) | TTVector(_)})}, methodName = "push" | "unshift", _)}, args) if (args.args.length == 0):
+				var lead = removeLeadingTrivia(e);
+				var trail = removeTrailingTrivia(e);
+				// normalize trivia so we don't end up with indentation between object and `.length`
+				processLeadingToken(t -> t.leadTrivia = lead, eArray);
+				processTrailingToken(t -> t.trailTrivia = [], eArray);
+				var fieldObj = {kind: TOExplicit(mkDot(), eArray), type: eArray.type};
+				var eLength = mk(TEField(fieldObj, "length", mkIdent("length")), TTInt, TTInt);
+				processTrailingToken(t -> t.trailTrivia = t.trailTrivia.concat(trail), eLength);
+				eLength;
+
 			// set length
 			case TEBinop({kind: TEField(to = {kind: TOExplicit(dot, eArray), type: TTArray(_)}, "length", _)}, op = OpAssign(_), eNewLength):
 				if (e.expectedType == TTVoid) {

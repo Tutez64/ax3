@@ -29,6 +29,19 @@ class ApiSignatureOverrides extends AbstractFilter {
 		]},
 		{owner: "openfl.text.TextFormat", name: "new", isCtor: true, args: [
 			{index: 2, target: TTInt, coerce: ToInt, allowNull: true}
+		]},
+		// Error(message, id) expects int for id in Haxe externs
+		{owner: "flash.errors.Error", name: "new", isCtor: true, args: [
+			{index: 1, target: TTInt, coerce: ToInt, allowNull: true}
+		]},
+		{owner: "openfl.errors.Error", name: "new", isCtor: true, args: [
+			{index: 1, target: TTInt, coerce: ToInt, allowNull: true}
+		]},
+		{owner: "Error", name: "new", isCtor: true, args: [
+			{index: 1, target: TTInt, coerce: ToInt, allowNull: true}
+		]},
+		{owner: "flash.display.DisplayObjectContainer", name: "setChildIndex", isCtor: false, args: [
+			{index: 1, target: TTInt, coerce: ToInt, allowNull: false}
 		]}
 	];
 
