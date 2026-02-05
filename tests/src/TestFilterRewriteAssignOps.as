@@ -15,6 +15,14 @@ package {
             var enabled:Boolean = false;
             enabled ||= true;
             enabled &&= false;
+
+            var flags:int = 1;
+            flags |= 2;
+            flags &= 3;
+            flags ^= 4;
+            flags <<= 1;
+            flags >>= 1;
+            flags >>>= 1;
         }
     }
 }
