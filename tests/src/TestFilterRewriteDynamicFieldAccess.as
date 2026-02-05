@@ -10,6 +10,7 @@ package {
             var mc:MovieClip = new MovieClip();
             mc.worldmap = new MovieClip();
             var value:* = mc.worldmap;
+            var ctor:Class = mc.constructor;
         }
     }
 }

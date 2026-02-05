@@ -43,6 +43,7 @@ class RewriteDynamicFieldAccess extends AbstractFilter {
 	}
 
 	function needsDynamicFieldAccess(t:TType, fieldName:String):Bool {
+		if (fieldName == "constructor") return true;
 		return switch t {
 			case TTInst(cls):
 				if (!isDynamicClass(cls)) false else cls.findFieldInHierarchy(fieldName, false) == null;

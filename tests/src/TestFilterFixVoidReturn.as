@@ -9,6 +9,10 @@ package {
             return;
         }
 
+        public function returnsAnyMissing(flag:Boolean):* {
+            if (flag) return 1;
+        }
+
         public function returnsObject(flag:Boolean):Object {
             if (flag) return {};
             return;

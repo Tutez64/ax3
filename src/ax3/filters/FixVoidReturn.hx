@@ -55,6 +55,24 @@ class FixVoidReturn extends AbstractFilter {
 		returnStack.push(retType);
 		if (fun.expr != null) {
 			fun.expr = processExpr(fun.expr);
+			if (retType != TTVoid) {
+				switch fun.expr.kind {
+					case TEBlock(block):
+						if (block.exprs.length == 0 || !block.exprs[block.exprs.length - 1].expr.kind.match(TEReturn(_))) {
+							var keyword = mkIdent("return");
+							if (keyword.trailTrivia.length == 0) {
+								keyword.trailTrivia.push(whitespace);
+							}
+							var value = defaultReturnExpr(retType);
+							block.exprs.push({
+								expr: mk(TEReturn(keyword, value), TTVoid, TTVoid),
+								semicolon: addTrailingNewline(mkSemicolon())
+							});
+							fun.expr = fun.expr.with(kind = TEBlock(block));
+						}
+					case _:
+				}
+			}
 		}
 		returnStack.pop();
 	}
