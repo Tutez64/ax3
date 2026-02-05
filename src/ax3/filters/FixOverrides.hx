@@ -55,8 +55,73 @@ class FixOverrides extends AbstractFilter {
 					applyProxySignature(f.fun.sig, f.name);
 				}
 
+			case TFGetter(a):
+				var isStatic = Lambda.exists(field.modifiers, m -> m.match(FMStatic(_)));
+				if (isStatic) {
+					removeOverride(field);
+					return;
+				}
+				var base = findAccessorInHierarchy(superClass, a.name, isStatic, true);
+				if (base != null) {
+					ensureOverride(field);
+					alignSignature(a.fun.sig, base.fun.sig);
+				}
+
+			case TFSetter(a):
+				var isStatic = Lambda.exists(field.modifiers, m -> m.match(FMStatic(_)));
+				if (isStatic) {
+					removeOverride(field);
+					return;
+				}
+				var base = findAccessorInHierarchy(superClass, a.name, isStatic, false);
+				if (base != null) {
+					ensureOverride(field);
+					alignSignature(a.fun.sig, base.fun.sig);
+				}
+
 			case _:
 		}
+	}
+
+	function findAccessorInHierarchy(cls:TClassOrInterfaceDecl, name:String, isStatic:Bool, wantGetter:Bool):Null<TAccessorField> {
+		function matches(field:TClassField):Null<TAccessorField> {
+			var fieldIsStatic = Lambda.exists(field.modifiers, m -> m.match(FMStatic(_)));
+			if (fieldIsStatic != isStatic) return null;
+			return switch field.kind {
+				case TFGetter(a) if (wantGetter && a.name == name):
+					a;
+				case TFSetter(a) if (!wantGetter && a.name == name):
+					a;
+				case _:
+					null;
+			}
+		}
+
+		function loop(c:TClassOrInterfaceDecl):Null<TAccessorField> {
+			for (member in c.members) {
+				switch member {
+					case TMField(f):
+						var found = matches(f);
+						if (found != null) return found;
+					case _:
+				}
+			}
+			switch c.kind {
+				case TInterface(info):
+					if (info.extend != null) {
+						for (h in info.extend.interfaces) {
+							var found = loop(h.iface.decl);
+							if (found != null) return found;
+						}
+					}
+				case TClass(info):
+					if (info.extend != null) {
+						return loop(info.extend.superClass);
+					}
+			}
+			return null;
+		}
+		return loop(cls);
 	}
 
 	function ensureOverride(field:TClassField) {
