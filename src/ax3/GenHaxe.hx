@@ -867,7 +867,27 @@ class GenHaxe extends PrinterBase {
 	}
 
 	inline function getClassLocalPath(cls:TClassOrInterfaceDecl):String {
+		if (isModulePrivateClass(cls)) {
+			return normalizeTypeName(cls.name);
+		}
 		return if (currentModule.isImported(cls)) normalizeTypeName(cls.name) else makeFQN(cls);
+	}
+
+	function isModulePrivateClass(cls:TClassOrInterfaceDecl):Bool {
+		if (cls.parentModule != currentModule) return false;
+		switch currentModule.pack.decl.kind {
+			case TDClassOrInterface(c) if (c == cls):
+				return false;
+			case _:
+		}
+		for (decl in currentModule.privateDecls) {
+			switch decl.kind {
+				case TDClassOrInterface(c) if (c == cls):
+					return true;
+				case _:
+			}
+		}
+		return false;
 	}
 
 	static function makeFQN(cls:TClassOrInterfaceDecl) {
@@ -957,6 +977,7 @@ class GenHaxe extends PrinterBase {
 				case [TTClass, TTStatic(_)]: true; // untyped Class unified with Class<ConcreteOne>
 
 				case [TTFun([argType], _, _), TTFun([TTAny], _)] if (argType != TTAny): true; // add/remove event listener
+				case [TTFun([], _), TTFun([_], _)]: true; // allow zero-arg handlers where one-arg is expected
 
 				case [TTArray(TTAny), TTArray(TTAny)]: false; // untyped arrays
 				case [TTArray(elemType), TTArray(TTAny)]: true; // typed array to untyped array
