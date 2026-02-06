@@ -274,6 +274,10 @@ class RewriteForIn extends AbstractFilter {
 				eobj = mk(TEHaxeRetype(eobj), TTAny, TTAny);
 				loopVarType = TTAny;
 
+			case TTObject(TTAny):
+				eobj = mkIteratorMethodCallExpr(eobj, "iterator");
+				loopVarType = TTAny;
+
 			case TTAny:
 				loopVarType = TTAny;
 			case TTArray(t) | TTVector(t) | TTDictionary(_, t) | TTObject(t):
