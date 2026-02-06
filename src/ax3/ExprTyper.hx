@@ -471,7 +471,7 @@ class ExprTyper {
 									kind: TOImplicitThis(currentClass),
 									type: TTInst(currentClass)
 								};
-							var type = getFieldType(field);
+							var type = if (ident == "length" && isArrayClass(c)) TTInt else getFieldType(field);
 							return mk(TEField(eobj, ident, i), type, expectedType);
 						}
 						switch c.kind {
@@ -635,6 +635,10 @@ class ExprTyper {
 	}
 
 	function typeInstanceField(cls:TClassOrInterfaceDecl, fieldName:String, pos):TType {
+		if (fieldName == "length" && isArrayClass(cls)) {
+			// Flash Array.length is uint, but Haxe exposes Int.
+			return TTInt;
+		}
 		function loop(cls:TClassOrInterfaceDecl):Null<TClassField> {
 			var field = cls.findField(fieldName, false);
 			if (field != null) {
@@ -670,6 +674,21 @@ class ExprTyper {
 		}
 
 		return throwErr('Unknown instance field $fieldName on class ${cls.name}', pos);
+	}
+
+	function isArrayClass(cls:TClassOrInterfaceDecl):Bool {
+		if (cls.name == "Array") return true;
+		return switch cls.kind {
+			case TClass(info):
+				info.extend != null ? isArrayClass(info.extend.superClass) : false;
+			case TInterface(info):
+				if (info.extend != null) {
+					for (i in info.extend.interfaces) {
+						if (isArrayClass(i.iface.decl)) return true;
+					}
+				}
+				false;
+		}
 	}
 
 	function typeXMLFieldAccess(xml:TExpr, dot:Token, field:Token, expectedType:TType):TExpr {
