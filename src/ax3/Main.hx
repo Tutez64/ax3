@@ -25,6 +25,8 @@ class Main {
 		checkSet(config.src, 'src');
 		checkSet(config.hxout, 'hxout');
 		checkSet(config.swc, 'swc');
+		if (config.settings == null) config.settings = {};
+		if (config.settings.flashProperties == null) config.settings.flashProperties = FlashPropertiesSetting.none;
 
 		ctx = new Context(config);
 		clean();

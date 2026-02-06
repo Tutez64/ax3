@@ -665,7 +665,8 @@ class GenHaxe extends PrinterBase {
 							true;
 					};
 
-				if (addMeta) buf.add("@:flash.property @:isVar ");
+				if (addMeta) buf.add("@:flash.property ");
+				buf.add("@:isVar ");
 				if (p.isPublic) buf.add("public ");
 				if (p.isStatic) buf.add("static ");
 				buf.add("var ");
