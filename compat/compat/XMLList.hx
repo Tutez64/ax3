@@ -6,6 +6,14 @@ import Xml as StdXml;
 private typedef XMLListImpl = #if flash flash.xml.XMLList #else Array<XML> #end;
 
 abstract XMLList(XMLListImpl) from XMLListImpl to XMLListImpl {
+	public static inline function typeReference() {
+		#if flash
+		return flash.xml.XMLList;
+		#else
+		return Array;
+		#end
+	}
+
 	public function child(name:String):XMLList {
 		#if flash
 		return this.child(name);

@@ -5,6 +5,14 @@ import Xml as StdXml;
 private typedef XMLImpl = #if flash flash.xml.XML #else StdXml #end;
 
 abstract XML(XMLImpl) from XMLImpl to XMLImpl {
+	public static inline function typeReference() {
+		#if flash
+		return flash.xml.XML;
+		#else
+		return StdXml;
+		#end
+	}
+
 	public inline function new(x:String) {
 		#if flash
 		this = new flash.xml.XML(x);

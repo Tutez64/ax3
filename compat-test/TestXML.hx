@@ -16,6 +16,16 @@ class TestXML extends utest.Test {
 		equals("<p>Hello</p>", x.toXMLString());
 	}
 
+	function testTypeReference() {
+		#if flash
+		isTrue(compat.XML.typeReference() == flash.xml.XML);
+		isTrue(compat.XMLList.typeReference() == flash.xml.XMLList);
+		#else
+		isTrue(compat.XML.typeReference() == Xml);
+		isTrue(compat.XMLList.typeReference() == Array);
+		#end
+	}
+
 	function testAppendChild() {
 		var x = new compat.XML("<ul/>");
 		x.appendChild(new compat.XML("<li>1</li>"));
