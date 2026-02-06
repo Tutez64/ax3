@@ -6,6 +6,7 @@
  * - Fall-through cases (grouped).
  * - Default case.
  * - Continue inside switch (should use flag rewrite).
+ * - int subject with uint case should cast case in guard.
  */
 package {
     public class TestFilterRewriteSwitch {
@@ -60,6 +61,15 @@ package {
                         res += 2;
                         break;
                 }
+            }
+        }
+
+        public function testIntUintSwitch(val:int):void {
+            var code:uint = 5;
+            switch(val) {
+                case code:
+                    trace("uint case");
+                    break;
             }
         }
     }

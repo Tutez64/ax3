@@ -1175,8 +1175,20 @@ class GenHaxe extends PrinterBase {
 					printExpr(e);
 				} else {
 					var trailTrivia = TypedTreeTools.removeTrailingTrivia(e);
+					var needsIntCast = s.subj.type == TTInt && e.type == TTUint;
+					var needsUIntCast = s.subj.type == TTUint && e.type == TTInt;
 					buf.add("(_ == ");
-					printExpr(e);
+					if (needsIntCast) {
+						buf.add("ASCompat.toInt(");
+						printExpr(e);
+						buf.add(")");
+					} else if (needsUIntCast) {
+						buf.add("(");
+						printExpr(e);
+						buf.add(" : UInt)");
+					} else {
+						printExpr(e);
+					}
 					buf.add(" => true)");
 					printTrivia(trailTrivia);
 					hasNonConstantPattern = true;
