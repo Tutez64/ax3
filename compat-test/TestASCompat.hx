@@ -98,6 +98,16 @@ class TestASCompat extends utest.Test {
 		equals(3, sortable[2]);
 	}
 
+	function testArrayForEach() {
+		var values = [1, 2, 3];
+		var sum = 0;
+		ASCompat.ASArray.forEach(values, function(value:Int, index:Int, array:Array<Int>):Void {
+			sum += value;
+			equals(value, array[index]);
+		});
+		equals(6, sum);
+	}
+
 	function testArrayPushUnshiftMultiple() {
 		var items = [1];
 		var len = ASCompat.ASArray.pushMultiple(items, 2, 3, 4);
@@ -155,6 +165,20 @@ class TestASCompat extends utest.Test {
 		});
 		equals(1, v[0]);
 		equals(3, v[2]);
+	}
+
+	function testVectorForEach() {
+		var v = new flash.Vector<Int>();
+		v.push(1);
+		v.push(2);
+		v.push(3);
+
+		var sum = 0;
+		ASCompat.ASVector.forEach(v, function(value:Int, index:Int, vector:flash.Vector<Int>):Void {
+			sum += value;
+			equals(value, vector[index]);
+		});
+		equals(6, sum);
 	}
 
 	function testFilterXmlList() {

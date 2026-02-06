@@ -46,6 +46,11 @@ package {
                 return item;
             }, this);
 
+            // map with void callback should be rewritten to forEach
+            items.map(function(item:*, index:int, array:Array):void {
+                items2[0] = item;
+            }, this);
+
             var newLen:int = items.push(1, 2);
             items.unshift(3, 4);
             items.push();
@@ -80,6 +85,11 @@ package {
             vec2 = vec2.reverse();
             var mappedVec:Vector.<int> = vec2.map(function(item:int, index:int, vector:Vector.<int>):int {
                 return item + 1;
+            }, this);
+
+            // vector map with void callback should be rewritten to forEach
+            vec2.map(function(item:int, index:int, vector:Vector.<int>):void {
+                vec2.push(item);
             }, this);
         }
     }

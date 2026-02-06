@@ -37,7 +37,15 @@ class ArrayApi extends AbstractFilter {
 				var compatName = if (isVector) "ASCompat.ASVector" else "ASCompat.ASArray";
 				var eCompat = mkBuiltin(compatName, TTBuiltin, removeLeadingTrivia(eArr));
 				var fieldObj = {kind: TOExplicit(mkDot(), eCompat), type: eCompat.type};
-				var eMethod = mk(TEField(fieldObj, "map", mkIdent("map")), TTFunction, TTFunction);
+				var methodName = switch args.args {
+					case [eCallback, _] | [eCallback]:
+						switch eCallback.expr.type {
+							case TTFun(_, TTVoid, _): "forEach";
+							case _: "map";
+						}
+					case _: "map";
+				}
+				var eMethod = mk(TEField(fieldObj, methodName, mkIdent(methodName)), TTFunction, TTFunction);
 				e.with(kind = TECall(eMethod, args.with(args = [{expr: eArr, comma: commaWithSpace}].concat(args.args))));
 
 			// sort constants

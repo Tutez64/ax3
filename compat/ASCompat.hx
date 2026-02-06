@@ -377,6 +377,13 @@ class ASArray {
 		return false;
 	}
 
+	public static function forEach<T>(a:Array<T>, callback:(item:T, index:Int, array:Array<T>)->Void, ?thisObj:Dynamic):Void {
+		for (i in 0...a.length) {
+			if (thisObj != null) Reflect.callMethod(thisObj, callback, [a[i], i, a])
+			else Reflect.callMethod(null, callback, [a[i], i, a]);
+		}
+	}
+
 	public static inline function map<T, U>(a:Array<T>, callback:(item:T, index:Int, array:Array<T>)->U, ?thisObj:Dynamic):Array<U> {
 		var out:Array<U> = [];
 		for (i in 0...a.length) {
@@ -440,6 +447,13 @@ class ASVector {
 		}
 		return a;
 		#end
+	}
+
+	public static function forEach<T>(a:flash.Vector<T>, callback:(item:T, index:Int, vector:flash.Vector<T>)->Void, ?thisObj:Dynamic):Void {
+		for (i in 0...a.length) {
+			if (thisObj != null) Reflect.callMethod(thisObj, callback, [a[i], i, a])
+			else Reflect.callMethod(null, callback, [a[i], i, a]);
+		}
 	}
 
 	public static inline function map<T, U>(a:flash.Vector<T>, callback:(item:T, index:Int, vector:flash.Vector<T>)->U, ?thisObj:Dynamic):flash.Vector<U> {
