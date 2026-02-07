@@ -45,7 +45,7 @@ class Main {
 		var files = [];
 		var srcs = if (Std.isOfType(config.src, String)) [config.src] else config.src;
 		for (src in srcs) {
-			walk(src, files);
+			walk(src, src, files);
 		}
 
 		t = stamp();
@@ -131,11 +131,11 @@ class Main {
 		return skipFiles != null && skipFiles.contains(path);
 	}
 
-	static function walk(dir:String, files:Array<ParseTree.File>) {
+	static function walk(root:String, dir:String, files:Array<ParseTree.File>) {
 		for (name in FileSystem.readDirectory(dir)) {
 			var absPath = dir + "/" + name;
 			if (FileSystem.isDirectory(absPath)) {
-				walk(absPath, files);
+				walk(root, absPath, files);
 			} else if (!shouldSkip(absPath)) {
 				final extIndex = name.lastIndexOf('.') + 1;
 				if (extIndex <= 1) continue;
@@ -145,16 +145,25 @@ class Main {
 					if (file != null) {
 						files.push(file);
 					}
-				} else if (
-					ctx.config.dataout != null && ctx.config.dataext != null &&
-					ctx.config.dataext.indexOf(ext) != -1
-				) {
-					print('Walk copy file ' + absPath);
-					final t = stamp();
-					final dst = ctx.config.dataout + name;
-					if (FileSystem.exists(dst)) print('File exists, overwrite');
-					File.copy(absPath, dst);
-					Timers.copy += stamp() - t;
+				} else {
+					var relPath = absPath.substr(root.length);
+					if (relPath.startsWith("/")) relPath = relPath.substr(1);
+					var dest = ctx.config.hxout + "/" + relPath;
+					var destDir = Path.directory(dest);
+					if (!FileSystem.exists(destDir)) FileSystem.createDirectory(destDir);
+					File.copy(absPath, dest);
+
+					if (
+						ctx.config.dataout != null && ctx.config.dataext != null &&
+						ctx.config.dataext.indexOf(ext) != -1
+					) {
+						print('Walk copy file ' + absPath);
+						final t = stamp();
+						final dst = ctx.config.dataout + name;
+						if (FileSystem.exists(dst)) print('File exists, overwrite');
+						File.copy(absPath, dst);
+						Timers.copy += stamp() - t;
+					}
 				}
 			}
 		}
