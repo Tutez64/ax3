@@ -45,6 +45,21 @@ class RewriteMeta extends AbstractFilter {
 			processClass(classInfo.extend.superClass);
 		}
 
+		var newClassMetadata = [];
+		for (meta in c.metadata) {
+			switch meta {
+				case MetaFlash(m):
+					if (m.name.text == "Embed") {
+						newClassMetadata.push(processEmbed(m));
+					} else {
+						newClassMetadata.push(meta);
+					}
+				case MetaHaxe(_):
+					newClassMetadata.push(meta);
+			}
+		}
+		c.metadata = newClassMetadata;
+
 		var rmList: Array<Int> = [];
 		var needsTypeAwareInterface = false;
 		var i: Int = 0;
@@ -161,55 +176,7 @@ class RewriteMeta extends AbstractFilter {
 										// 		case TFVar(_): throwError(m.name.pos, "Inline meta on a var?");
 										// 	}
 									case "Embed":
-										var map: Map<String, String> = [for (a in m.args.args.rest.map(function(f) return f.element).concat([m.args.args.first])) {
-											var kv: {k: String, v: String} = switch a {
-												case EBinop(EIdent(n), OpAssign(_), ELiteral(LString(v))):
-													{ k: n.text, v: StringTools.trim(v.text.substr(1, v.text.length - 2)) };
-												case _:
-													reportError(m.name.pos, "Unknown embed metadata format"); null;
-											}
-											if (kv != null) kv.k => kv.v;
-										}];
-										switch map['mimeType'] {
-											case "application/x-font", "application/x-font-truetype":
-												newMetadata.push(MetaHaxe(
-													mkIdent('@:font', m.openBracket.leadTrivia, []),
-													{
-														openParen: mkOpenParen(),
-														args: {
-															first: ELiteral(LString(mkString(map['source']))),
-															rest: []
-														},
-														closeParen: mkCloseParen()
-													}
-												));
-											case "application/octet-stream":
-												newMetadata.push(MetaHaxe(
-													mkIdent('@:file', m.openBracket.leadTrivia, []),
-													{
-														openParen: mkOpenParen(),
-														args: {
-															first: ELiteral(LString(mkString(map['source']))),
-															rest: []
-														},
-														closeParen: mkCloseParen()
-													}
-												));
-											case null:
-												newMetadata.push(MetaHaxe(
-													mkIdent('@:bitmap', m.openBracket.leadTrivia, []),
-													{
-														openParen: mkOpenParen(),
-														args: {
-															first: ELiteral(LString(mkString(map['source']))),
-															rest: []
-														},
-														closeParen: mkCloseParen()
-													}
-												));
-											case t:
-												reportError(m.name.pos, "Unknown mimeType: " + t);
-										}
+										newMetadata.push(processEmbed(m));
 									case other:
 										reportError(m.name.pos, "Unknown metadata: " + other);
 										newMetadata.push(meta);
@@ -244,6 +211,71 @@ class RewriteMeta extends AbstractFilter {
 				classInfo.implement.interfaces[classInfo.implement.interfaces.length - 1].comma = commaWithSpace;
 				classInfo.implement.interfaces.push(heritage);
 			}
+		}
+	}
+
+	function processEmbed(m: ParseTree.Metadata): TMetadata {
+		var map: Map<String, String> = [for (a in m.args.args.rest.map(function(f) return f.element).concat([m.args.args.first])) {
+			var kv: {k: String, v: String} = switch a {
+				case EBinop(EIdent(n), OpAssign(_), ELiteral(LString(v))):
+					{ k: n.text, v: StringTools.trim(v.text.substr(1, v.text.length - 2)) };
+				case _:
+					reportError(m.name.pos, "Unknown embed metadata format"); null;
+			}
+			if (kv != null) kv.k => kv.v;
+		}];
+		if (map.exists('symbol')) {
+			return MetaHaxe(
+				mkIdent('@:native', m.openBracket.leadTrivia, []),
+				{
+					openParen: mkOpenParen(),
+					args: {
+						first: ELiteral(LString(mkString(map['symbol']))),
+						rest: []
+					},
+					closeParen: mkCloseParen(m.closeBracket.trailTrivia)
+				}
+			);
+		} else switch map['mimeType'] {
+			case "application/x-font", "application/x-font-truetype":
+				return MetaHaxe(
+					mkIdent('@:font', m.openBracket.leadTrivia, []),
+					{
+						openParen: mkOpenParen(),
+						args: {
+							first: ELiteral(LString(mkString(map['source']))),
+							rest: []
+						},
+						closeParen: mkCloseParen(m.closeBracket.trailTrivia)
+					}
+				);
+			case "application/octet-stream":
+				return MetaHaxe(
+					mkIdent('@:file', m.openBracket.leadTrivia, []),
+					{
+						openParen: mkOpenParen(),
+						args: {
+							first: ELiteral(LString(mkString(map['source']))),
+							rest: []
+						},
+						closeParen: mkCloseParen(m.closeBracket.trailTrivia)
+					}
+				);
+			case null:
+				return MetaHaxe(
+					mkIdent('@:bitmap', m.openBracket.leadTrivia, []),
+					{
+						openParen: mkOpenParen(),
+						args: {
+							first: ELiteral(LString(mkString(map['source']))),
+							rest: []
+						},
+						closeParen: mkCloseParen(m.closeBracket.trailTrivia)
+					}
+				);
+			case t:
+				reportError(m.name.pos, "Unknown mimeType: " + t);
+				return MetaFlash(m);
 		}
 	}
 
