@@ -249,6 +249,33 @@ class TestASCompat extends utest.Test {
 		equals("null", ASCompat.toString(null));
 	}
 
+	function testToNumberField() {
+		// Test with existing field - should return the numeric value
+		var obj:ASObject = {value: 42};
+		floatEquals(42, ASCompat.toNumberField(obj, "value"));
+
+		// Test with existing field "length" on an array
+		var arr:Array<Int> = [1, 2, 3];
+		floatEquals(3, ASCompat.toNumberField(arr, "length"));
+
+		// Test with non-existing field - should return NaN (not 0)
+		floatEquals(Math.NaN, ASCompat.toNumberField(obj, "nonExistent"));
+
+		// Test with null object - should return NaN
+		var nullObj:ASObject = null;
+		floatEquals(Math.NaN, ASCompat.toNumberField(nullObj, "value"));
+
+		// Test with undefined-like scenario (field access on object without the field)
+		var emptyObj:ASObject = {};
+		floatEquals(Math.NaN, ASCompat.toNumberField(emptyObj, "missingField"));
+
+		// Test comparison behavior: NaN <= 0 should be false, not true
+		// This is the key difference: toNumberField returns NaN for missing fields,
+		// while toNumber would return 0 for null
+		var result = ASCompat.toNumberField(emptyObj, "length") <= 0;
+		isFalse(result);
+	}
+
 	function testDateApi() {
 		var dTime = Date.fromTime(0);
 		ASCompat.ASDate.setTime(dTime, 1234567);

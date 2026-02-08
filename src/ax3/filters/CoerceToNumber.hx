@@ -3,6 +3,7 @@ package ax3.filters;
 class CoerceToNumber extends AbstractFilter {
 	static final tToInt = TTFun([TTAny], TTInt);
 	static final tToNumber = TTFun([TTAny], TTNumber);
+	static final tToNumberField = TTFun([TTAny, TTString], TTNumber);
 	static final tStdInt = TTFun([TTNumber], TTInt);
 	var tempId:Int = 0;
 
@@ -151,6 +152,24 @@ class CoerceToNumber extends AbstractFilter {
 	}
 
 	static function mkToNumberCall(e:TExpr):TExpr {
+		// Check if this is a field access on a Dynamic/Any object
+		// In such cases, we need to use toNumberField to handle undefined correctly
+		switch e.kind {
+			case TEField(fieldObj, fieldName, _):
+				switch fieldObj.kind {
+					case TOExplicit(dot, eobj):
+						// For field access on Dynamic objects, use toNumberField
+						// to properly handle undefined values (which Haxe converts to null)
+						var objExpr = eobj.with(expectedType = eobj.type);
+						var fieldNameExpr = mk(TELiteral(TLString(new Token(0, TkStringDouble, '"' + fieldName + '"', [], []))), TTString, TTString);
+						var eToNumberField = mkBuiltin("ASCompat.toNumberField", tToNumberField, removeLeadingTrivia(e));
+						return mkCall(eToNumberField, [objExpr, fieldNameExpr], TTNumber, removeTrailingTrivia(e));
+					case _:
+						// Fall through to default
+				}
+			case _:
+				// Fall through to default
+		}
 		var eToNumber = mkBuiltin("ASCompat.toNumber", tToNumber, removeLeadingTrivia(e));
 		return mkCall(eToNumber, [e.with(expectedType = e.type)], TTNumber, removeTrailingTrivia(e));
 	}

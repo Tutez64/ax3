@@ -69,6 +69,22 @@ class ASCompat {
 		#end
 	}
 
+	// Number(obj.fieldName) - handles undefined fields correctly
+	// When accessing a field on a Dynamic object, Haxe converts undefined to null
+	// but AS3 Number(undefined) = NaN while Number(null) = 0
+	public static inline function toNumberField(obj:Dynamic, fieldName:String):Float {
+		#if flash
+		// Check for null first - __in__ operator doesn't work with null in Flash
+		if (obj == null) return Math.NaN;
+		// Use "in" operator to check if field exists before accessing it
+		return untyped __in__(fieldName, obj) ? untyped __global__["Number"](obj[fieldName]) : Math.NaN;
+		#else
+		// For JS, use Reflect to check field existence and get value
+		if (obj == null || !Reflect.hasField(obj, fieldName)) return Math.NaN;
+		return js.Syntax.code("Number")(Reflect.field(obj, fieldName));
+		#end
+	}
+
 	// Boolean(d)
 	public static inline function toBool(d:Dynamic):Bool {
 		#if flash
