@@ -26,10 +26,15 @@ abstract ASAny(Dynamic)
 		if (Reflect.hasField(this, name)) {
 			return true;
 		}
-		var clazz = Type.getClass(this);
-		if (clazz != null) {
-			var fields = Type.getInstanceFields(clazz);
-			return fields.indexOf(name) > -1 || fields.indexOf("get_" + name) > -1 || fields.indexOf("set_" + name) > -1;
+		try {
+			var clazz = Type.getClass(this);
+			if (clazz != null) {
+				var fields = Type.getInstanceFields(clazz);
+				return fields.indexOf(name) > -1 || fields.indexOf("get_" + name) > -1 || fields.indexOf("set_" + name) > -1;
+			}
+		} catch (e:Dynamic) {
+			// Type.getClass can fail on some Flash objects (MovieClip, dynamically loaded objects)
+			// In this case, fall back to Reflect.hasField which we already checked
 		}
 		return false;
 	}
