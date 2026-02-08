@@ -30,28 +30,23 @@ class RewriteAs extends AbstractFilter {
 							closeParen: mkCloseParen(removeTrailingTrivia(e))
 						}));
 
-					case TTInt | TTUint | TTNumber | TTString | TTBoolean: // omg
-						// TODO: this is not correct: we need to actually check and return null here
-						reportError(keyword.pos, "`as` operator with basic type");
-
-						var path, trail;
-						switch (typeRef.syntax) {
-							case TPath(dotPath):
-								path = dotPath;
-								path.first.leadTrivia = removeLeadingTrivia(eobj).concat(path.first.leadTrivia);
-								trail = processDotPathTrailingToken(t -> t.removeTrailingTrivia(), path);
-							case _:
-								throw "asset";
+					case TTInt | TTUint | TTNumber | TTString | TTBoolean | TTXML | TTXMLList:
+						var methodName = switch (typeRef.type) {
+							case TTInt: "asInt";
+							case TTUint: "asUint";
+							case TTNumber: "asNumber";
+							case TTString: "asString";
+							case TTBoolean: "asBool";
+							case TTXML: "asXML";
+							case TTXMLList: "asXMLList";
+							case _: throw "assert";
 						};
 
-						e.with(kind = TECast({
-							syntax: {
-								openParen: mkOpenParen(),
-								closeParen: mkCloseParen(trail),
-								path: path
-							},
-							expr: eobj,
-							type: typeRef.type
+						var eAsMethod = mkBuiltin("ASCompat." + methodName, TTFunction, removeLeadingTrivia(e));
+						e.with(kind = TECall(eAsMethod, {
+							openParen: mkOpenParen(),
+							args: [{expr: eobj, comma: null}],
+							closeParen: mkCloseParen(removeTrailingTrivia(e))
 						}));
 
 					case TTVector(elemType):
@@ -64,10 +59,6 @@ class RewriteAs extends AbstractFilter {
 							],
 							closeParen: mkCloseParen(removeTrailingTrivia(e))
 						}));
-
-					case TTXML | TTXMLList:
-						// XML types are abstracts, so a runtime `as` check is not reliable.
-						e.with(kind = TEHaxeRetype(eobj));
 
 					case TTDictionary(k, v):
 						if (k != TTAny || v != TTAny) throwError(exprPos(e), "assert"); // only untyped Dictionary can come from the AS3 `as` cast

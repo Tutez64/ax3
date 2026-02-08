@@ -81,9 +81,55 @@ class ASCompat {
 	// String(d)
 	public static inline function toString(d:Dynamic):String {
 		#if flash
-		return d;
+		return Std.string(d);
 		#else
 		return js.Syntax.code("String")(d);
+		#end
+	}
+
+	public static inline function asString(v:Any):Null<String> {
+		return if (Std.isOfType(v, String)) cast v else null;
+	}
+
+	public static inline function asNumber(v:Any):Null<Float> {
+		return if (Std.isOfType(v, Float)) cast v else null;
+	}
+
+	public static inline function asInt(v:Any):Null<Int> {
+		return if (Std.isOfType(v, Int)) cast v else null;
+	}
+
+	public static inline function asUint(v:Any):Null<Int> {
+		#if flash
+		return if (untyped __is__(v, untyped __global__["uint"])) cast v else null;
+		#else
+		return if (Std.isOfType(v, Int) && (cast v : Int) >= 0) cast v else null;
+		#end
+	}
+
+	public static inline function asBool(v:Any):Null<Bool> {
+		#if flash
+		return if (untyped __is__(v, untyped __global__["Boolean"])) cast v else null;
+		#elseif js
+		return if (js.Syntax.typeof(v) == "boolean") cast v else null;
+		#else
+		return if (v == true || v == false) cast v else null;
+		#end
+	}
+
+	public static inline function asXML(v:Any):Null<compat.XML> {
+		#if flash
+		return if (Std.isOfType(v, flash.xml.XML)) cast v else null;
+		#else
+		return if (Std.isOfType(v, Xml)) cast v else null;
+		#end
+	}
+
+	public static inline function asXMLList(v:Any):Null<compat.XMLList> {
+		#if flash
+		return if (Std.isOfType(v, flash.xml.XMLList)) cast v else null;
+		#else
+		return if (Std.isOfType(v, Array)) cast v else null;
 		#end
 	}
 

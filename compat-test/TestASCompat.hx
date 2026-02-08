@@ -213,6 +213,42 @@ class TestASCompat extends utest.Test {
 		equals("object", ASCompat.typeof(null));
 	}
 
+	function testAsOperator() {
+		equals("test", ASCompat.asString("test"));
+		equals(null, ASCompat.asString(123));
+		equals(null, ASCompat.asString(function() {}));
+
+		equals(123, ASCompat.asInt(123));
+		equals(null, ASCompat.asInt(123.4));
+		equals(null, ASCompat.asInt("123"));
+
+		equals(123, ASCompat.asUint(123));
+		equals(null, ASCompat.asUint(-1));
+		equals(null, ASCompat.asUint(123.4));
+
+		equals(123.4, ASCompat.asNumber(123.4));
+		equals(123, ASCompat.asNumber(123));
+		equals(null, ASCompat.asNumber("123.4"));
+
+		equals(true, ASCompat.asBool(true));
+		equals(false, ASCompat.asBool(false));
+		equals(null, ASCompat.asBool(1));
+
+		var xml = new compat.XML("<root/>");
+		equals(xml, ASCompat.asXML(xml));
+		equals(null, ASCompat.asXML("test"));
+
+		var xmlList = xml.children();
+		equals(xmlList, ASCompat.asXMLList(xmlList));
+		equals(null, ASCompat.asXMLList(xml));
+	}
+
+	function testToString() {
+		equals("123", ASCompat.toString(123));
+		equals("true", ASCompat.toString(true));
+		equals("null", ASCompat.toString(null));
+	}
+
 	function testDateApi() {
 		var dTime = Date.fromTime(0);
 		ASCompat.ASDate.setTime(dTime, 1234567);
