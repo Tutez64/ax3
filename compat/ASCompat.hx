@@ -54,7 +54,7 @@ class ASCompat {
 	// int(d), uint(d)
 	public static inline function toInt(d:Dynamic):Int {
 		#if flash
-		return d;
+		return untyped __global__["int"](d);
 		#else
 		return Std.int(toNumber(d));
 		#end
@@ -63,7 +63,7 @@ class ASCompat {
 	// Number(d)
 	public static inline function toNumber(d:Dynamic):Float {
 		#if flash
-		return d;
+		return untyped __global__["Number"](d);
 		#else
 		return js.Syntax.code("Number")(d);
 		#end
@@ -72,7 +72,7 @@ class ASCompat {
 	// Boolean(d)
 	public static inline function toBool(d:Dynamic):Bool {
 		#if flash
-		return d;
+		return untyped __global__["Boolean"](d);
 		#else
 		return js.Syntax.code("Boolean")(d);
 		#end

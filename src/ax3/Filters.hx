@@ -67,7 +67,6 @@ class Filters {
 			new AddMissingAccessorInSuper(context),
 			new RewriteAccessorAccess(context),
 			new UnqualifiedSuperStatics(context),
-			new FixNonInlineableDefaultArgs(context),
 			// new AddParens(context),
 			new AddRequiredParens(context),
 			// new CheckExpectedTypes(context)
@@ -87,6 +86,7 @@ class Filters {
 			new FunctionApply(context),
 			new ToString(context),
 			new CoerceFromAny(context),
+			new FixNonInlineableDefaultArgs(context),
 			new FixIteratorCasts(context),
 			new FixDowncastRetypes(context),
 			new NamespacedToPublic(context),
