@@ -6,7 +6,7 @@ class FunctionApply extends AbstractFilter {
 
 	override function processExpr(e:TExpr):TExpr {
 		return switch e.kind {
-			case TECall({kind: TEField({kind: TOExplicit(_, eFun = {type: TTFunction | TTFun(_)})}, "apply", _)}, args):
+			case TECall({kind: TEField({kind: TOExplicit(_, eFun = {type: TTFunction | TTFun(_) | TTAny | TTObject(TTAny)})}, "apply", _)}, args):
 				eFun = processExpr(eFun);
 				args = mapCallArgs(processExpr, args);
 				switch args.args {
@@ -27,7 +27,7 @@ class FunctionApply extends AbstractFilter {
 						throwError(exprPos(e), "Invalid Function.apply");
 				}
 
-			case TECall({kind: TEField({kind: TOExplicit(_, eFun = {type: TTFunction | TTFun(_)})}, "call", _)}, args):
+			case TECall({kind: TEField({kind: TOExplicit(_, eFun = {type: TTFunction | TTFun(_) | TTAny | TTObject(TTAny)})}, "call", _)}, args):
 				eFun = processExpr(eFun);
 				args = mapCallArgs(processExpr, args);
 				switch args.args {
@@ -51,7 +51,7 @@ class FunctionApply extends AbstractFilter {
 						])));
 				}
 
-			case TEField({type: TTFunction | TTFun(_)}, name = "apply" | "call", _):
+			case TEField({type: TTFunction | TTFun(_) | TTAny | TTObject(TTAny)}, name = "apply" | "call", _):
 				throwError(exprPos(e), "closure on Function." + name);
 
 			case _:
