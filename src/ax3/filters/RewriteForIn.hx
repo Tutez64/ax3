@@ -1,6 +1,11 @@
 package ax3.filters;
 
 import ax3.ParseTree.VarDeclKind;
+import ax3.ParseTree.SyntaxType;
+import ax3.Token;
+import ax3.TypedTree.TType;
+import ax3.TypedTreeTools.typeEq;
+import haxe.ds.List;
 
 class RewriteForIn extends AbstractFilter {
 	static final tIteratorMethod = TTFun([], TTBuiltin);
@@ -279,9 +284,15 @@ class RewriteForIn extends AbstractFilter {
 				loopVarType = TTAny;
 
 			case TTAny:
-				loopVarType = TTAny;
+				// Try to infer element type from array literal
+				loopVarType = tryInferElementTypeFromExpr(eobj);
 			case TTArray(t) | TTVector(t) | TTDictionary(_, t) | TTObject(t):
-				loopVarType = t;
+				// If the element type is Any, try to infer from array literal
+				if (t == TTAny) {
+					loopVarType = tryInferElementTypeFromExpr(eobj);
+				} else {
+					loopVarType = t;
+				}
 			case TTXMLList:
 				loopVarType = TTXML;
 			case other:
@@ -339,6 +350,38 @@ class RewriteForIn extends AbstractFilter {
 		var eCheckBuiltin = mkBuiltin(checkNullIterateeBuiltin, TTBuiltin);
 		context.addToplevelImport("ASCompat.checkNullIteratee", Import);
 		return mkCall(eCheckBuiltin, [eobj], TTBoolean);
+	}
+
+	/**
+	 * Try to infer the element type from an array literal expression.
+	 * This helps avoid unnecessary casts when iterating over array literals.
+	 */
+	function tryInferElementTypeFromExpr(e:TExpr):TType {
+		// Handle array literal [a, b, c]
+		switch e.kind {
+			case TEArrayDecl(arr):
+				if (arr.elements.length == 0) return TTAny;
+
+				// Try to find a common type among all elements
+				var commonType:TType = null;
+				for (elem in arr.elements) {
+					var elemType = elem.expr.type;
+					if (elemType == TTAny) {
+						// If any element is TTAny, we can't infer a common type
+						return TTAny;
+					}
+					if (commonType == null) {
+						commonType = elemType;
+					} else if (!typeEq(commonType, elemType)) {
+						// Types don't match, fall back to TTAny
+						return TTAny;
+					}
+				}
+				return commonType != null ? commonType : TTAny;
+
+			case _:
+				return TTAny;
+		}
 	}
 }
 

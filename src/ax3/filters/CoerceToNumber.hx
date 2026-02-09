@@ -72,6 +72,20 @@ class CoerceToNumber extends AbstractFilter {
 					return applyExpectedCoercion(e.with(kind = TEPostUnop(mappedInner, getPostUnopToken(e))));
 				}
 				return applyExpectedCoercion(e.with(kind = TEPostUnop(mappedInner, getPostUnopToken(e))));
+
+			// Handle assignment to Int/Uint local variables - force coercion to match the target type
+			case TEBinop(a, op = OpAssign(_), b):
+				var b2 = processExpr(b);
+				// Check if we're assigning to a local variable with Int/Uint type
+				switch a.kind {
+					case TELocal(_, v) if (v.type.match(TTInt | TTUint)):
+						// Force coercion of the RHS to match the variable's type
+						b2 = if (v.type == TTInt) coerceToInt(b2) else coerceToUInt(b2);
+					case _:
+				}
+				var a2 = processExpr(a);
+				applyExpectedCoercion(e.with(kind = TEBinop(a2, op, b2)));
+
 			case _:
 				applyExpectedCoercion(mapExpr(processExpr, e));
 		}

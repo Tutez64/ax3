@@ -34,7 +34,7 @@ class InferLocalVarTypes extends AbstractFilter {
 
 		function noteHint(info:VarInfo, hint:TType) {
 			if (info.incompatible) return;
-			
+
 			if (info.hint == null) {
 				info.hint = hint;
 			} else {
@@ -119,7 +119,7 @@ class InferLocalVarTypes extends AbstractFilter {
 
 		function noteUnary(info:VarInfo) {
 			if (info.incompatible) return;
-			
+
 			if (info.hint == null) {
 				noteHint(info, TTInt); // Assume Int for ++/--
 			} else {
@@ -128,10 +128,10 @@ class InferLocalVarTypes extends AbstractFilter {
 				}
 			}
 		}
-		
+
 		function noteUsage(info:VarInfo, impliedHint:TType) {
 			if (info.incompatible) return;
-			
+
 			if (info.hint == null) {
 				info.hint = impliedHint;
 			} else {
@@ -195,7 +195,7 @@ class InferLocalVarTypes extends AbstractFilter {
 					}
 					loop(a);
 					loop(b);
-				
+
 				case TEArrayAccess(a):
 					// Index usage implies Int only for Array/Vector/XMLList/ByteArray.
 					// For Object/Any, avoid forcing Int (keys are usually strings).
@@ -212,7 +212,7 @@ class InferLocalVarTypes extends AbstractFilter {
 					}
 					loop(a.eobj);
 					loop(a.eindex);
-					
+
 				case TELocal(_, v):
 					var info = infos[v];
 					if (info != null) {
@@ -220,6 +220,34 @@ class InferLocalVarTypes extends AbstractFilter {
 							info.incompatible = true;
 						}
 					}
+
+				case TEForEach(f):
+					// First process the loop variable declaration (to add candidates)
+					loop(f.iter.eit);
+					// Then process the iterable expression
+					loop(f.iter.eobj);
+					// Now infer loop variable type from array element type
+					// Handle both "for each (var item in ...)" (TEVars) and "for each (item in ...)" (TELocal)
+					var loopVar:Null<TVar> = switch f.iter.eit.kind {
+						case TELocal(_, v): v;
+						case TEVars(_, [varDecl]): varDecl.v;
+						case _: null;
+					}
+					if (loopVar != null) {
+						var info = infos[loopVar];
+						if (info != null) {
+							// Try to infer from the iterable expression
+							var objHint = hintFromExpr(f.iter.eobj);
+							switch objHint {
+								case TTArray(elemType):
+									if (elemType != null) {
+										noteHint(info, elemType);
+									}
+								case _:
+							}
+						}
+					}
+					loop(f.body);
 
 				default:
 					iterExpr(loop, e);
@@ -240,12 +268,38 @@ class InferLocalVarTypes extends AbstractFilter {
 			}
 		}
 	}
-	
+
 	static function hintFromExpr(e:TExpr):Null<TType> {
+		// For array declarations, try to find common type even if elements have known types
+		switch e.kind {
+			case TEArrayDecl(arr):
+				// Try to find a common type among all elements
+				var commonType:TType = null;
+				for (elem in arr.elements) {
+					var elemType = hintFromExpr(elem.expr);
+					if (elemType == null) {
+						commonType = null;
+						break;
+					}
+					if (commonType == null) {
+						commonType = elemType;
+					} else if (!typeEq(commonType, elemType)) {
+						// Types don't match, fall back to untyped array
+						commonType = null;
+						break;
+					}
+				}
+				if (commonType != null) {
+					return TTArray(commonType);
+				}
+				return TypedTreeTools.tUntypedArray; // Array<Any>
+			case _:
+		}
+
 		if (e.type != TTAny) {
 			return e.type;
 		}
-		
+
 		// Structural inference for untyped expressions
 		switch e.kind {
 			case TEBinop(a, op, b):
@@ -253,13 +307,13 @@ class InferLocalVarTypes extends AbstractFilter {
 				if (isArithmeticOp(op)) return TTNumber;
 				if (isComparisonOp(op)) return TTBoolean;
 				if (isBoolOp(op)) return TTBoolean;
-				
+
 				if (op.match(OpAdd(_))) {
 					var ha = hintFromExpr(a);
 					var hb = hintFromExpr(b);
 					// If any is String, result is String
 					if ((ha != null && typeEq(ha, TTString)) || (hb != null && typeEq(hb, TTString))) return TTString;
-					
+
 					// Refined numeric logic:
 					// If either is explicitly Number, result is Number
 					if ((ha != null && ha.match(TTNumber)) || (hb != null && hb.match(TTNumber))) return TTNumber;
@@ -269,7 +323,7 @@ class InferLocalVarTypes extends AbstractFilter {
 
 			case TECast(c):
 				return hintFromExpr(c.expr);
-			
+
 			case TEPreUnop(op, _):
 				if (op.match(PreBitNeg(_))) return TTInt;
 				if (op.match(PreNeg(_))) return TTNumber;
@@ -278,16 +332,16 @@ class InferLocalVarTypes extends AbstractFilter {
 
 			case TEPostUnop(_, op):
 				return TTNumber;
-				
+
 			case TEArrayDecl(_):
 				return TypedTreeTools.tUntypedArray; // Array<Any>
-				
+
 			case TENew(_, cls, _):
 				switch cls {
 					case TNType(t): return t.type;
 					case _:
 				}
-				
+
 			case TECall(eobj, args):
 				switch eobj.kind {
 					case TEField(o, "round" | "floor" | "ceil", _):
@@ -310,10 +364,10 @@ class InferLocalVarTypes extends AbstractFilter {
 						return null; // Unknown args
 					case _:
 				}
-				
+
 			case _:
 		}
-		
+
 		return null;
 	}
 
@@ -327,7 +381,7 @@ class InferLocalVarTypes extends AbstractFilter {
 
 	static function mergeTypes(current:TType, next:TType):Null<TType> {
 		if (typeEq(current, next)) return current;
-		
+
 		// Int/UInt upgrade to Number
 		if (isNumericType(current) && isNumericType(next)) {
 			// If either is Number, result is Number.
@@ -336,11 +390,11 @@ class InferLocalVarTypes extends AbstractFilter {
 			if (current.match(TTNumber) || next.match(TTNumber)) return TTNumber;
 			return TTInt; // Both are Int-like
 		}
-		
+
 		// Unification for classes?
 		// e.g. Sprite and Sprite -> Sprite (handled by typeEq)
 		// Sprite and MovieClip -> Incompatible for now (requires class hierarchy)
-		
+
 		return null;
 	}
 
@@ -367,14 +421,14 @@ class InferLocalVarTypes extends AbstractFilter {
 				false;
 		}
 	}
-	
+
 	static function isBitwiseOp(op:Binop):Bool {
 		return switch op {
 			case OpShl(_) | OpShr(_) | OpUshr(_) | OpBitAnd(_) | OpBitOr(_) | OpBitXor(_): true;
 			case _: false;
 		}
 	}
-	
+
 	static function isArithmeticOp(op:Binop):Bool {
 		return switch op {
 			case OpSub(_) | OpMul(_) | OpDiv(_) | OpMod(_): true;
@@ -382,14 +436,14 @@ class InferLocalVarTypes extends AbstractFilter {
 			case _: false;
 		}
 	}
-	
+
 	static function isComparisonOp(op:Binop):Bool {
 		return switch op {
 			case OpEquals(_) | OpNotEquals(_) | OpStrictEquals(_) | OpNotStrictEquals(_) | OpGt(_) | OpGte(_) | OpLt(_) | OpLte(_): true;
 			case _: false;
 		}
 	}
-	
+
 	static function isBoolOp(op:Binop):Bool {
 		return switch op {
 			case OpAnd(_) | OpOr(_): true;

@@ -109,6 +109,19 @@ package {
             var filterVar:*;
             filterVar = new ColorMatrixFilter();
             // filterVar should be ColorMatrixFilter
+            
+            // Case 13: Loop variable type inference from array elements
+            var arr1:Array = [1, 2, 3];
+            var arr2:Array = [4, 5, 6];
+            var arr3:Array = [7, 8, 9];
+
+            // The loop variable 'item' should be inferred as Array, not ASAny
+            // because all elements in the array are Arrays
+            for each (var item in [arr1, arr2, arr3]) {
+                // item should be typed as Array, allowing Array methods
+                var len:int = item.length;
+                var first:int = item[0];
+            }
         }
     }
 }
