@@ -98,7 +98,7 @@ class RewriteAs extends AbstractFilter {
 								processTrailingToken(t -> t.trailTrivia = t.trailTrivia.concat(removeTrailingTrivia(e)), eobj);
 								eobj.with(expectedType = e.expectedType); // it's important to keep the expected type for further filters
 							case CKDowncast:
-								e.with(kind = makeStdDowncast(eobj, eType, removeLeadingTrivia(e), removeTrailingTrivia(e)));
+								e.with(kind = makeAs(eobj, eType, removeLeadingTrivia(e), removeTrailingTrivia(e)));
 							case CKUnknown:
 								e.with(kind = makeAs(eobj, eType, removeLeadingTrivia(e), removeTrailingTrivia(e)));
 						}

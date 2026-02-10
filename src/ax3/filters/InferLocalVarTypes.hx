@@ -13,13 +13,35 @@ private typedef VarInfo = {
 	var incompatible:Bool;
 }
 
+private typedef MapValueInfo = {
+	var hint:TType;
+	var incompatible:Bool;
+}
+
 class InferLocalVarTypes extends AbstractFilter {
+	var fieldMapValueHints:Map<String, MapValueInfo> = null;
+	var currentClass:Null<TClassOrInterfaceDecl> = null;
+
+	override function processClass(c:TClassOrInterfaceDecl) {
+		fieldMapValueHints = new Map();
+		collectFieldMapValueHints(c, fieldMapValueHints);
+		currentClass = c;
+		super.processClass(c);
+		currentClass = null;
+		fieldMapValueHints = null;
+	}
+
 	override function processFunction(fun:TFunction) {
 		if (fun.expr == null) {
 			return;
 		}
 
 		var infos = new Map<TVar, VarInfo>();
+		var infoByName = new Map<String, VarInfo>();
+		var mapValueHints = cloneMapValueHints(fieldMapValueHints);
+		var mapIteratorHints = new Map<String, String>();
+		var mapIteratorValueHints = new Map<String, TType>();
+		var mapIteratorVarHints = new Map<TVar, String>();
 
 		function addCandidate(decl:TVarDecl) {
 			if (decl.v.type != TTAny) {
@@ -27,9 +49,14 @@ class InferLocalVarTypes extends AbstractFilter {
 			}
 			var hint:TType = null;
 			if (decl.init != null) {
-				hint = hintFromExpr(decl.init.expr);
+				hint = hintFromExpr(decl.init.expr, mapValueHints, mapIteratorHints);
+				if (hint != null && typeEq(hint, TTAny)) {
+					hint = null;
+				}
 			}
-			infos[decl.v] = {decl: decl, hint: hint, incompatible: false};
+			var info = {decl: decl, hint: hint, incompatible: false};
+			infos[decl.v] = info;
+			infoByName[decl.v.name] = info;
 		}
 
 		function noteHint(info:VarInfo, hint:TType) {
@@ -57,7 +84,7 @@ class InferLocalVarTypes extends AbstractFilter {
 					noteHint(info, TTNumber);
 				} else {
 					if (op.match(AOpAdd(_))) {
-						var rhsHint = hintFromExpr(rhs);
+						var rhsHint = hintFromExpr(rhs, mapValueHints, mapIteratorHints);
 						if (typeEq(rhsHint, TTString)) {
 							noteHint(info, TTString);
 						} else if (isNumericType(rhsHint)) {
@@ -83,7 +110,7 @@ class InferLocalVarTypes extends AbstractFilter {
 					info.incompatible = true;
 					return;
 				}
-				var hint = hintFromExpr(rhs);
+				var hint = hintFromExpr(rhs, mapValueHints, mapIteratorHints);
 				if (hint == null || !isNumericType(hint)) {
 					// Allow if RHS is unknown? No, restrict.
 					// But we should allow Int assigned to Number.
@@ -98,6 +125,59 @@ class InferLocalVarTypes extends AbstractFilter {
 			}
 		}
 
+		function extractLocalFromExpr(expr:TExpr):Null<TVar> {
+			return switch expr.kind {
+				case TELocal(_, v): v;
+				case TEParens(_, e, _): extractLocalFromExpr(e);
+				case TECast(c): extractLocalFromExpr(c.expr);
+				case TEField(obj, _, _):
+					switch obj.kind {
+						case TOExplicit(_, e): extractLocalFromExpr(e);
+						case _: null;
+					}
+				case _: null;
+			}
+		}
+
+		function hintFromIteratorNext(expr:TExpr):Null<TType> {
+			switch expr.kind {
+				case TECall(eobj, _):
+					switch eobj.kind {
+						case TEField(obj, "next", _):
+							var iteratorKey = mapKeyFromFieldObject(obj);
+							if (iteratorKey != null) {
+								var iterHint = mapIteratorValueHints[iteratorKey];
+								if (iterHint != null) {
+									return iterHint;
+								}
+								var iteratorVar = switch obj.kind {
+									case TOExplicit(_, e): extractLocalFromExpr(e);
+									case _: null;
+								};
+								if (iteratorVar != null) {
+									var mapKey = mapIteratorVarHints[iteratorVar];
+									if (mapKey != null) {
+										var info = mapValueHints[mapKey];
+										if (info != null && !info.incompatible) {
+											return info.hint;
+										}
+									}
+								}
+								var mapKey = mapIteratorHints[iteratorKey];
+								if (mapKey != null) {
+									var info = mapValueHints[mapKey];
+									if (info != null && !info.incompatible) {
+										return info.hint;
+									}
+								}
+							}
+						case _:
+					}
+				case _:
+			}
+			return null;
+		}
+
 		function noteAssign(info:VarInfo, op:Binop, rhs:TExpr) {
 			if (info.incompatible) {
 				return;
@@ -105,7 +185,13 @@ class InferLocalVarTypes extends AbstractFilter {
 
 			switch op {
 				case OpAssign(_):
-					var hint = hintFromExpr(rhs);
+					var hint = hintFromExpr(rhs, mapValueHints, mapIteratorHints);
+					if (hint != null && typeEq(hint, TTAny)) {
+						hint = null;
+					}
+					if (hint == null) {
+						hint = hintFromIteratorNext(rhs);
+					}
 					if (hint == null) {
 						info.incompatible = true;
 					} else {
@@ -153,10 +239,115 @@ class InferLocalVarTypes extends AbstractFilter {
 			}
 		}
 
+		function mapKeyFromIteratorExpr(expr:TExpr):Null<String> {
+			return switch expr.kind {
+				case TECast(c): mapKeyFromIteratorExpr(c.expr);
+				case TECall(eobj, _):
+					switch eobj.kind {
+						case TEField(obj, "iterator", _):
+							if (isAs3CommonsMap(obj.type)) {
+								mapKeyFromFieldObject(obj);
+							} else {
+								null;
+							}
+						case _: null;
+					}
+				case _: null;
+			}
+		}
+
+		function noteMapIteratorBinding(v:TVar, expr:TExpr) {
+			var mapKey = mapKeyFromIteratorExpr(expr);
+			if (mapKey != null) {
+				var localKey = "local:" + v.name;
+				var fieldKey = "field:" + v.name;
+				mapIteratorHints[localKey] = mapKey;
+				mapIteratorHints[fieldKey] = mapKey;
+				mapIteratorVarHints[v] = mapKey;
+				var mapInfo = mapValueHints[mapKey];
+				if (mapInfo != null && !mapInfo.incompatible) {
+					mapIteratorValueHints[localKey] = mapInfo.hint;
+					mapIteratorValueHints[fieldKey] = mapInfo.hint;
+				}
+			}
+		}
+
+		function localVarFromFieldObject(obj:TFieldObject):Null<TVar> {
+			return switch obj.kind {
+				case TOExplicit(_, e): extractLocalFromExpr(e);
+				case _: null;
+			}
+		}
+
+		function infoFromFieldObject(obj:TFieldObject):Null<VarInfo> {
+			var localVar = localVarFromFieldObject(obj);
+			if (localVar != null) {
+				return infos[localVar];
+			}
+			var mapKey = mapKeyFromFieldObject(obj);
+			if (mapKey != null) {
+				if (mapKey.length > 6 && mapKey.substr(0, 6) == "local:") {
+					return infoByName[mapKey.substr(6)];
+				}
+				if (mapKey.length > 6 && mapKey.substr(0, 6) == "field:") {
+					return infoByName[mapKey.substr(6)];
+				}
+			}
+			return null;
+		}
+
+		function findFunctionTypeByName(name:String):Null<TType> {
+			if (currentClass == null) return null;
+			for (member in currentClass.members) {
+				switch member {
+					case TMField(field):
+						switch field.kind {
+							case TFFun(f):
+								if (f.name == name) return f.type;
+							case TFGetter(f):
+								if (f.name == name) return f.fun.sig.ret.type;
+							case TFSetter(f):
+								if (f.name == name) return f.fun.sig.ret.type;
+							case TFVar(_):
+						}
+					case _:
+				}
+			}
+			return null;
+		}
+
+		function inferSortElementType(args:TCallArgs):Null<TType> {
+			if (args.args.length == 0) return null;
+			var firstArg = args.args[0].expr;
+			switch firstArg.type {
+				case TTFun(funArgs, _):
+					if (funArgs.length >= 2 && funArgs[0] != null && typeEq(funArgs[0], funArgs[1])) {
+						return funArgs[0];
+					}
+				case _:
+			}
+			switch firstArg.kind {
+				case TEField(_, fieldName, _):
+					var type = findFunctionTypeByName(fieldName);
+					switch type {
+						case TTFun(funArgs, _):
+							if (funArgs.length >= 2 && funArgs[0] != null && typeEq(funArgs[0], funArgs[1])) {
+								return funArgs[0];
+							}
+						case _:
+					}
+				case _:
+			}
+			return null;
+		}
+
 		function loop(e:TExpr) {
 			switch e.kind {
 				case TEVars(_, vars):
 					for (decl in vars) {
+						if (decl.init != null) {
+							noteMapIteratorBinding(decl.v, decl.init.expr);
+						}
 						addCandidate(decl);
 						if (decl.init != null) {
 							loop(decl.init.expr);
@@ -172,6 +363,7 @@ class InferLocalVarTypes extends AbstractFilter {
 							if (info != null) {
 								noteAssign(info, op, b);
 							}
+							noteMapIteratorBinding(v, b);
 						case _:
 					}
 					if (!isLocalAssign) loop(a);
@@ -237,7 +429,7 @@ class InferLocalVarTypes extends AbstractFilter {
 						var info = infos[loopVar];
 						if (info != null) {
 							// Try to infer from the iterable expression
-							var objHint = hintFromExpr(f.iter.eobj);
+							var objHint = hintFromExpr(f.iter.eobj, mapValueHints, mapIteratorHints);
 							switch objHint {
 								case TTArray(elemType):
 									if (elemType != null) {
@@ -248,6 +440,32 @@ class InferLocalVarTypes extends AbstractFilter {
 						}
 					}
 					loop(f.body);
+
+				case TECall(eobj, args):
+					switch eobj.kind {
+						case TEField(obj, "sort", _):
+							var info = infoFromFieldObject(obj);
+							if (info != null) {
+								var elemType = inferSortElementType(args);
+								if (elemType != null) {
+									info.hint = TTVector(elemType);
+									info.incompatible = false;
+								}
+							}
+						case TEField(obj, "add", _):
+							if (isAs3CommonsMap(obj.type)) {
+								var mapKey = mapKeyFromFieldObject(obj);
+								if (mapKey != null && args.args.length >= 2) {
+									var valueHint = hintFromExpr(args.args[1].expr, mapValueHints, mapIteratorHints);
+									noteMapValue(mapValueHints, mapKey, valueHint);
+								}
+							}
+						case _:
+					}
+					loop(eobj);
+					for (arg in args.args) {
+						loop(arg.expr);
+					}
 
 				default:
 					iterExpr(loop, e);
@@ -269,14 +487,14 @@ class InferLocalVarTypes extends AbstractFilter {
 		}
 	}
 
-	static function hintFromExpr(e:TExpr):Null<TType> {
+	static function hintFromExpr(e:TExpr, mapValueHints:Map<String, MapValueInfo>, mapIteratorHints:Map<String, String>):Null<TType> {
 		// For array declarations, try to find common type even if elements have known types
 		switch e.kind {
 			case TEArrayDecl(arr):
 				// Try to find a common type among all elements
 				var commonType:TType = null;
 				for (elem in arr.elements) {
-					var elemType = hintFromExpr(elem.expr);
+					var elemType = hintFromExpr(elem.expr, mapValueHints, mapIteratorHints);
 					if (elemType == null) {
 						commonType = null;
 						break;
@@ -296,6 +514,11 @@ class InferLocalVarTypes extends AbstractFilter {
 			case _:
 		}
 
+		var mapHint = hintFromMapCall(e, mapValueHints, mapIteratorHints);
+		if (mapHint != null) {
+			return mapHint;
+		}
+
 		if (e.type != TTAny) {
 			return e.type;
 		}
@@ -309,8 +532,8 @@ class InferLocalVarTypes extends AbstractFilter {
 				if (isBoolOp(op)) return TTBoolean;
 
 				if (op.match(OpAdd(_))) {
-					var ha = hintFromExpr(a);
-					var hb = hintFromExpr(b);
+					var ha = hintFromExpr(a, mapValueHints, mapIteratorHints);
+					var hb = hintFromExpr(b, mapValueHints, mapIteratorHints);
 					// If any is String, result is String
 					if ((ha != null && typeEq(ha, TTString)) || (hb != null && typeEq(hb, TTString))) return TTString;
 
@@ -322,7 +545,7 @@ class InferLocalVarTypes extends AbstractFilter {
 				}
 
 			case TECast(c):
-				return hintFromExpr(c.expr);
+				return hintFromExpr(c.expr, mapValueHints, mapIteratorHints);
 
 			case TEPreUnop(op, _):
 				if (op.match(PreBitNeg(_))) return TTInt;
@@ -353,7 +576,7 @@ class InferLocalVarTypes extends AbstractFilter {
 						var hasFloat = false;
 						var hasInt = false;
 						for (arg in args.args) {
-							var h = hintFromExpr(arg.expr);
+							var h = hintFromExpr(arg.expr, mapValueHints, mapIteratorHints);
 							if (h != null) {
 								if (h.match(TTNumber)) hasFloat = true;
 								else if (isNumericType(h)) hasInt = true;
@@ -369,6 +592,145 @@ class InferLocalVarTypes extends AbstractFilter {
 		}
 
 		return null;
+	}
+
+	static function hintFromMapCall(e:TExpr, mapValueHints:Map<String, MapValueInfo>, mapIteratorHints:Map<String, String>):Null<TType> {
+		switch e.kind {
+			case TECall(eobj, _):
+				switch eobj.kind {
+					case TEField(obj, "itemFor", _):
+						if (mapValueHints != null && isAs3CommonsMap(obj.type)) {
+							var mapKey = mapKeyFromFieldObject(obj);
+							if (mapKey != null) {
+								var info = mapValueHints[mapKey];
+								if (info != null && !info.incompatible) {
+									return info.hint;
+								}
+							}
+						}
+					case TEField(obj, "next", _):
+						if (mapIteratorHints != null && mapValueHints != null) {
+							var iteratorKey = mapKeyFromFieldObject(obj);
+							if (iteratorKey != null) {
+								var mapKey = mapIteratorHints[iteratorKey];
+								if (mapKey != null) {
+									var info = mapValueHints[mapKey];
+									if (info != null && !info.incompatible) {
+										return info.hint;
+									}
+								}
+							}
+						}
+					case _:
+				}
+			case _:
+		}
+		return null;
+	}
+
+	static function collectFieldMapValueHints(c:TClassOrInterfaceDecl, mapValueHints:Map<String, MapValueInfo>) {
+		function loopExpr(e:TExpr) {
+			switch e.kind {
+				case TECall(eobj, args):
+					switch eobj.kind {
+						case TEField(obj, "add", _):
+							if (isAs3CommonsMap(obj.type)) {
+								var mapKey = mapKeyFromFieldObject(obj);
+								if (mapKey != null && args.args.length >= 2) {
+									var valueHint = hintFromExpr(args.args[1].expr, null, null);
+									noteMapValue(mapValueHints, mapKey, valueHint);
+								}
+							}
+						case _:
+					}
+					loopExpr(eobj);
+					for (arg in args.args) {
+						loopExpr(arg.expr);
+					}
+				default:
+					iterExpr(loopExpr, e);
+			}
+		}
+
+		for (m in c.members) {
+			switch m {
+				case TMField(field):
+					switch field.kind {
+						case TFVar(v):
+							if (v.init != null) {
+								loopExpr(v.init.expr);
+							}
+						case TFFun(f):
+							if (f.fun.expr != null) loopExpr(f.fun.expr);
+						case TFGetter(f):
+							if (f.fun.expr != null) loopExpr(f.fun.expr);
+						case TFSetter(f):
+							if (f.fun.expr != null) loopExpr(f.fun.expr);
+					}
+				case TMStaticInit(i):
+					loopExpr(i.expr);
+				case TMUseNamespace(_):
+				case TMCondCompBegin(_):
+				case TMCondCompEnd(_):
+			}
+		}
+	}
+
+	static function mapKeyFromFieldObject(obj:TFieldObject):Null<String> {
+		return switch obj.kind {
+			case TOExplicit(_, e): mapKeyFromExpr(e);
+			case TOImplicitThis(_): null;
+			case TOImplicitClass(_): null;
+		}
+	}
+
+	static function mapKeyFromExpr(e:TExpr):Null<String> {
+		return switch e.kind {
+			case TELocal(_, v): "local:" + v.name;
+			case TEField(obj, fieldName, _):
+				switch obj.kind {
+					case TOImplicitThis(_): "field:" + fieldName;
+					case TOImplicitClass(_): "static:" + fieldName;
+					case TOExplicit(_, inner):
+						var innerKey = mapKeyFromExpr(inner);
+						innerKey != null ? innerKey + "." + fieldName : null;
+				}
+			case _: null;
+		}
+	}
+
+	static function isAs3CommonsMap(t:TType):Bool {
+		return switch t {
+			case TTInst({name: "Map", parentModule: {parentPack: {name: "org.as3commons.collections"}}}): true;
+			case _: false;
+		}
+	}
+
+	static function noteMapValue(mapValueHints:Map<String, MapValueInfo>, mapKey:String, hint:TType) {
+		if (mapValueHints == null) return;
+		if (hint == null || typeEq(hint, TTAny)) return;
+		var info = mapValueHints[mapKey];
+		if (info == null) {
+			mapValueHints[mapKey] = {hint: hint, incompatible: false};
+			return;
+		}
+		if (info.incompatible) return;
+		var merged = mergeTypes(info.hint, hint);
+		if (merged == null) {
+			info.incompatible = true;
+		} else {
+			info.hint = merged;
+		}
+	}
+
+	static function cloneMapValueHints(mapValueHints:Map<String, MapValueInfo>):Map<String, MapValueInfo> {
+		var cloned = new Map<String, MapValueInfo>();
+		if (mapValueHints == null) return cloned;
+		for (key in mapValueHints.keys()) {
+			var info = mapValueHints[key];
+			cloned[key] = {hint: info.hint, incompatible: info.incompatible};
+		}
+		return cloned;
 	}
 
 	static function isNumericType(t:TType):Bool {
