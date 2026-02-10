@@ -10,10 +10,10 @@ import haxe.ds.List;
 class RewriteForIn extends AbstractFilter {
 	static final tIteratorMethod = TTFun([], TTBuiltin);
 	static inline final tempLoopVarName = "_tmp_";
-	static inline final tempIterateeVarName = "_iter_";
 	public static inline final checkNullIterateeBuiltin = "checkNullIteratee";
 
 	final generateCheckNullIteratee:Bool;
+	var tempIterateeVarId:Int = 0;
 
 	public function new(context:Context) {
 		super(context);
@@ -178,6 +178,7 @@ class RewriteForIn extends AbstractFilter {
 		return [for (item in trivia) new Trivia(item.kind, item.text)];
 	}
 
+
 	function takeLeadingTrivia(expr:TExpr):Array<Trivia> {
 		var lead = removeLeadingTrivia(expr);
 		processLeadingToken(t -> t.leadTrivia = cloneTrivia(lead).concat(t.leadTrivia), expr);
@@ -191,10 +192,11 @@ class RewriteForIn extends AbstractFilter {
 				tempVar: null,
 			};
 		else {
-			var tempVar = {name: tempIterateeVarName, type: e.type};
+			var tempVarName = "__ax3_iter_" + tempIterateeVarId++;
+			var tempVar = {name: tempVarName, type: e.type};
 			{
 				tempVar: tempVar,
-				expr: mk(TELocal(mkIdent(tempIterateeVarName), tempVar), e.type, e.type),
+				expr: mk(TELocal(mkIdent(tempVarName), tempVar), e.type, e.type),
 			};
 		};
 	}
