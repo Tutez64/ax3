@@ -87,8 +87,24 @@ class MoveFieldInits extends AbstractFilter {
 		};
 
 		var insertAt = 0;
-		if (block.exprs.length > 0 && isSuperCall(block.exprs[0].expr)) {
-			insertAt = 1;
+		for (i in 0...block.exprs.length) {
+			if (isSuperCall(block.exprs[i].expr)) {
+				insertAt = i + 1;
+				break;
+			}
+		}
+		var deps = new Map<String, Bool>();
+		for (item in pending) {
+			collectFieldDeps(item.init.expr, deps);
+		}
+		if (deps.keys().hasNext()) {
+			for (i in 0...block.exprs.length) {
+				if (assignsToDeps(block.exprs[i].expr, deps)) {
+					if (i + 1 > insertAt) {
+						insertAt = i + 1;
+					}
+				}
+			}
 		}
 
 		var indent = TypedTreeTools.getInnerIndent(expr);
@@ -166,6 +182,37 @@ class MoveFieldInits extends AbstractFilter {
 		return switch obj.kind {
 			case TOImplicitThis(_): true;
 			case TOExplicit(_, {kind: TELiteral(TLThis(_) | TLSuper(_))}): true;
+			case _:
+				false;
+		}
+	}
+
+	static function collectFieldDeps(e:TExpr, deps:Map<String, Bool>):Void {
+		switch e.kind {
+			case TEField(obj, name, _):
+				if (isThisObject(obj)) {
+					deps[name] = true;
+				} else {
+					switch obj.kind {
+						case TOExplicit(_, inner): collectFieldDeps(inner, deps);
+						case _:
+					}
+				}
+			case _:
+				iterExpr(e2 -> collectFieldDeps(e2, deps), e);
+		}
+	}
+
+	static function assignsToDeps(e:TExpr, deps:Map<String, Bool>):Bool {
+		return switch e.kind {
+			case TEParens(_, inner, _): assignsToDeps(inner, deps);
+			case TEBinop(left, OpAssign(_), _):
+				switch left.kind {
+					case TEField(obj, name, _):
+						isThisObject(obj) && deps.exists(name);
+					case _:
+						false;
+				}
 			case _:
 				false;
 		}
