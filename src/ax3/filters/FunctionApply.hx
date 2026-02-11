@@ -2,6 +2,7 @@ package ax3.filters;
 
 class FunctionApply extends AbstractFilter {
 	static final tcallMethod = TTFun([TTAny, TTFunction, TTArray(TTAny)], TTAny);
+	static final tapplyMethod = TTFun([TTAny, TTAny, TTAny], TTAny);
 	static final eEmptyArray = mk(TEArrayDecl({syntax: {openBracket: mkOpenBracket(), closeBracket: mkCloseBracket()}, elements: []}), tUntypedArray, tUntypedArray);
 
 	override function processExpr(e:TExpr):TExpr {
@@ -19,8 +20,8 @@ class FunctionApply extends AbstractFilter {
 							thisArg, {expr: eFun, comma: commaWithSpace}, {expr: eEmptyArray, comma: null}
 						])));
 					case [thisArg, eArgs]:
-						var eCallMethod = mkBuiltin("Reflect.callMethod", tcallMethod, removeLeadingTrivia(eFun));
-						e.with(kind = TECall(eCallMethod, args.with(args = [
+						var eApplyMethod = mkBuiltin("ASCompat.applyMethod", tapplyMethod, removeLeadingTrivia(eFun));
+						e.with(kind = TECall(eApplyMethod, args.with(args = [
 							thisArg, {expr: eFun, comma: commaWithSpace}, eArgs
 						])));
 					case _:

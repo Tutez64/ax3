@@ -10,6 +10,7 @@ class ASCompat {
 
 	public static inline final MAX_FLOAT = 1.79e+308;
 	public static inline final MIN_FLOAT = -1.79E+308;
+	public static final UNDEFINED:Dynamic = new ASUndefined();
 
 	public static inline function checkNullIteratee<T>(v:Null<T>, ?pos:haxe.PosInfos):Bool {
 		if (v == null) {
@@ -21,6 +22,10 @@ class ASCompat {
 
 	static function reportNullIteratee(pos:haxe.PosInfos) {
 		haxe.Log.trace("FIXME: Null value passed as an iteratee for for-in/for-each expression!", pos);
+	}
+
+	public static inline function isUndefined(v:Dynamic):Bool {
+		return v == UNDEFINED;
 	}
 
 	public static inline function escape(s:String):String {
@@ -63,6 +68,7 @@ class ASCompat {
 	// Number(d)
 	public static inline function toNumber(d:Dynamic):Float {
 		#if flash
+		if (isUndefined(d)) return Math.NaN;
 		return untyped __global__["Number"](d);
 		#else
 		return js.Syntax.code("Number")(d);
@@ -88,6 +94,7 @@ class ASCompat {
 	// Boolean(d)
 	public static inline function toBool(d:Dynamic):Bool {
 		#if flash
+		if (isUndefined(d)) return false;
 		return untyped __global__["Boolean"](d);
 		#else
 		return js.Syntax.code("Boolean")(d);
@@ -97,9 +104,26 @@ class ASCompat {
 	// String(d)
 	public static inline function toString(d:Dynamic):String {
 		#if flash
+		if (isUndefined(d)) return "undefined";
 		return Std.string(d);
 		#else
 		return js.Syntax.code("String")(d);
+		#end
+	}
+
+	public static inline function parse(s:String):Dynamic {
+		#if flash
+		return flash.utils.JSON.parse(s);
+		#else
+		return haxe.Json.parse(s);
+		#end
+	}
+
+	public static inline function stringify(v:Dynamic):String {
+		#if flash
+		return flash.utils.JSON.stringify(v);
+		#else
+		return haxe.Json.stringify(v);
 		#end
 	}
 
@@ -117,9 +141,11 @@ class ASCompat {
 
 	public static inline function asUint(v:Any):Null<Int> {
 		#if flash
-		return if (untyped __is__(v, untyped __global__["uint"])) cast v else null;
+		if (isUndefined(v) || v == null) return 0;
+		return untyped __global__["uint"](v);
 		#else
-		return if (Std.isOfType(v, Int) && (cast v : Int) >= 0) cast v else null;
+		if (isUndefined(v) || v == null) return 0;
+		return Std.int(toNumber(v));
 		#end
 	}
 
@@ -147,6 +173,17 @@ class ASCompat {
 		#else
 		return if (Std.isOfType(v, Array)) cast v else null;
 		#end
+	}
+
+	public static inline function undefinedToNull(v:Dynamic):Dynamic {
+		return isUndefined(v) ? null : v;
+	}
+
+	public static inline function applyMethod(target:Dynamic, func:Dynamic, args:Dynamic):Dynamic {
+		if (isUndefined(args) || args == null) {
+			return Reflect.callMethod(target, func, []);
+		}
+		return Reflect.callMethod(target, func, cast args);
 	}
 
 	public static inline function typeof(value:Dynamic):String {

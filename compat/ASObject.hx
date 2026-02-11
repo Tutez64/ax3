@@ -46,16 +46,24 @@ abstract ASObject(flash.utils.Object)
 
 	#if flash
 	@:to public inline function ___toString():String return cast this;
-	@:to inline function ___toBool():Bool return cast this;
+	@:to inline function ___toBool():Bool {
+		if (ASCompat.isUndefined(this)) {
+			return false;
+		}
+		return cast this;
+	}
 	@:to inline function ___toFloat():Float return cast this;
 	@:to inline function ___toInt():Int return cast this;
 	#elseif js
 	@:to public inline function ___toString():String return if (this == null) null else "" + this;
-	@:to inline function ___toBool():Bool return js.Syntax.code("Boolean")(this);
+	@:to inline function ___toBool():Bool return ASCompat.isUndefined(this) ? false : js.Syntax.code("Boolean")(this);
 	@:to inline function ___toFloat():Float return js.Syntax.code("Number")(this);
 	@:to inline function ___toInt():Int return Std.int(___toFloat());
 	#else
 	@:to function ___toBool():Bool {
+		if (ASCompat.isUndefined(this)) {
+			return false;
+		}
 		if (this == null) {
 			return false;
 		}
@@ -97,8 +105,16 @@ abstract ASObject(flash.utils.Object)
 	}
 
 	// see ASAny.___eq/___neq comments
-	@:op(a == b) inline function ___eq(that:Dynamic):Bool return this == that;
-	@:op(a != b) inline function ___neq(that:Dynamic):Bool return this != that;
+	@:op(a == b) inline function ___eq(that:Dynamic):Bool {
+		if (ASCompat.isUndefined(this)) {
+			return that == null || ASCompat.isUndefined(that);
+		}
+		if (ASCompat.isUndefined(that)) {
+			return this == null;
+		}
+		return this == that;
+	}
+	@:op(a != b) inline function ___neq(that:Dynamic):Bool return !___eq(that);
 
 	@:op(a.b) inline function ___get(name:String):ASAny return ASAny.getPropertyOrBoundMethod(this, name);
 

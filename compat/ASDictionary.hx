@@ -11,7 +11,7 @@ abstract ASDictionary<K,V>(Dictionary<K,V>) from Dictionary<K,V> to Dictionary<K
 
 	@:op([]) public inline function get(key:K):Null<V> {
 		#if flash
-		return untyped this[key];
+		return untyped __in__(key, this) ? this[key] : cast ASCompat.UNDEFINED;
 		#else
 		return this.get(key);
 		#end

@@ -41,16 +41,24 @@ abstract ASAny(Dynamic)
 
 	#if flash
 	@:to public function ___toString():String return cast this;
-	@:to function ___toBool():Bool return cast this;
+	@:to function ___toBool():Bool {
+		if (ASCompat.isUndefined(this)) {
+			return false;
+		}
+		return cast this;
+	}
 	@:to function ___toFloat():Float return cast this;
 	@:to function ___toInt():Int return cast this;
 	#elseif js
 	@:to public inline function ___toString():String return if (this == null) null else "" + this;
-	@:to inline function ___toBool():Bool return js.Syntax.code("Boolean")(this);
+	@:to inline function ___toBool():Bool return ASCompat.isUndefined(this) ? false : js.Syntax.code("Boolean")(this);
 	@:to inline function ___toFloat():Float return js.Syntax.code("Number")(this);
 	@:to inline function ___toInt():Int return Std.int(___toFloat());
 	#else
 	@:to function ___toBool():Bool {
+		if (ASCompat.isUndefined(this)) {
+			return false;
+		}
 		if (this == null) {
 			return false;
 		}
@@ -94,8 +102,16 @@ abstract ASAny(Dynamic)
 	// use use native equality check, because AS3 and JS behave the same
 	// but if we want to build for other targets, we gotta implement the loose equality crap
 	// (or not, because there should be no ASAny in the final code)
-	@:op(a == b) inline function ___eq(that:Dynamic):Bool return this == that;
-	@:op(a != b) inline function ___neq(that:Dynamic):Bool return this != that;
+	@:op(a == b) inline function ___eq(that:Dynamic):Bool {
+		if (ASCompat.isUndefined(this)) {
+			return that == null || ASCompat.isUndefined(that);
+		}
+		if (ASCompat.isUndefined(that)) {
+			return this == null;
+		}
+		return this == that;
+	}
+	@:op(a != b) inline function ___neq(that:Dynamic):Bool return !___eq(that);
 
 	@:op(a.b) inline function ___get(name:String):ASAny return ASAny.getPropertyOrBoundMethod(this, name);
 
@@ -112,10 +128,17 @@ abstract ASAny(Dynamic)
 		}
 		if (!handled) {
 			#if flash
-			result = Reflect.getProperty(obj, name);
+			var value:Dynamic = Reflect.getProperty(obj, name);
+			if (value == null && !hasFieldOrAccessor(obj, name)) {
+				result = ASCompat.UNDEFINED;
+			} else {
+				result = value;
+			}
 			#else
 			var value:Dynamic = Reflect.getProperty(obj, name);
-			if (Reflect.isFunction(value)) {
+			if (value == null && !hasFieldOrAccessor(obj, name)) {
+				result = ASCompat.UNDEFINED;
+			} else if (Reflect.isFunction(value)) {
 				result = value.bind(obj); // TODO: maybe we should (ab)use Haxe/JS $bind here for caching the bound methods?
 			} else {
 				result = value;
@@ -191,5 +214,23 @@ abstract ASAny(Dynamic)
 			}
 		}
 		return Std.parseInt(name);
+	}
+
+	static function hasFieldOrAccessor(obj:Any, name:String):Bool {
+		if (Reflect.hasField(obj, name)) {
+			return true;
+		}
+		try {
+			var clazz = Type.getClass(obj);
+			if (clazz != null) {
+				var fields = Type.getInstanceFields(clazz);
+				return fields.indexOf(name) > -1
+					|| fields.indexOf("get_" + name) > -1
+					|| fields.indexOf("set_" + name) > -1;
+			}
+		} catch (e:Dynamic) {
+			// Type.getClass can fail on some Flash objects (MovieClip, dynamically loaded objects).
+		}
+		return false;
 	}
 }

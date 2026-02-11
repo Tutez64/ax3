@@ -1098,8 +1098,8 @@ class GenHaxe extends PrinterBase {
 				"Std.isOfType" | "cast" | "Std.int" | "Std.string" | "String"
 				| "flash.Lib.getTimer" | "flash.Lib.getURL"
 				| "Reflect.deleteField" | "Type.createInstance"| "Type.resolveClass" | "Type.getClassName" | "Type.getClass"
-				| "haxe.Json" | "Reflect.compare" | "Reflect.isFunction" | "Math.POSITIVE_INFINITY" | "Math.NEGATIVE_INFINITY"
-				| "StringTools.replace" | "StringTools.hex" | "Reflect.callMethod" | "ASDictionary.asDictionary" | "_":
+				| "haxe.Json" | "ASCompat" | "Reflect.compare" | "Reflect.isFunction" | "Math.POSITIVE_INFINITY" | "Math.NEGATIVE_INFINITY"
+				| "StringTools.replace" | "StringTools.hex" | "Reflect.callMethod" | "ASCompat.applyMethod" | "ASDictionary.asDictionary" | "_":
 					name;
 			case "Number": "Float";
 			case "int": "Int";
@@ -1578,7 +1578,7 @@ class GenHaxe extends PrinterBase {
 			case TLThis(syntax): printTextWithTrivia("this", syntax);
 			case TLBool(syntax): printTextWithTrivia(syntax.text, syntax);
 			case TLNull(syntax): printTextWithTrivia("null", syntax);
-			case TLUndefined(syntax): printTextWithTrivia("/*undefined*/null", syntax);
+			case TLUndefined(syntax): printTextWithTrivia("ASCompat.UNDEFINED", syntax);
 			case TLInt(syntax): printTextWithTrivia(syntax.text, syntax);
 			case TLNumber(syntax): printTextWithTrivia(syntax.text, syntax);
 			case TLString(syntax): printTextWithTrivia(replaceControlChars(syntax.text, syntax.kind), syntax);

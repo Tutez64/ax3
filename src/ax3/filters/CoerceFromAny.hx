@@ -21,8 +21,7 @@ class CoerceFromAny extends AbstractFilter {
 			case TTArray(_):
 				wrapDynamicAsType(e, "Array", e.expectedType);
 			case TTVector(_):
-				// Vector cast is tricky, leaving as retype for now
-				e.with(kind = TEHaxeRetype(e), type = e.expectedType, expectedType = e.expectedType);
+				wrapAsVector(e, e.expectedType);
 			case _:
 				e.with(kind = TEHaxeRetype(e), type = e.expectedType, expectedType = e.expectedType);
 		}
@@ -69,6 +68,24 @@ class CoerceFromAny extends AbstractFilter {
 			args: [
 				{expr: inner, comma: commaWithSpace},
 				{expr: eType, comma: null}
+			],
+			closeParen: mkCloseParen(trail)
+		}), targetType, targetType);
+	}
+
+	function wrapAsVector(inner:TExpr, targetType:TType):TExpr {
+		var lead = removeLeadingTrivia(inner);
+		var trail = removeTrailingTrivia(inner);
+		var elemType = switch targetType {
+			case TTVector(t): t;
+			case _: throw "assert";
+		};
+		var eMethod = mkBuiltin("ASCompat.asVector", TTFunction, lead);
+		return mk(TECall(eMethod, {
+			openParen: mkOpenParen(),
+			args: [
+				{expr: inner, comma: commaWithSpace},
+				{expr: RewriteAs.mkVectorTypeCheckMacroArg(elemType), comma: null}
 			],
 			closeParen: mkCloseParen(trail)
 		}), targetType, targetType);
