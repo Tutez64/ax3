@@ -415,7 +415,22 @@ class InferLocalVarTypes extends AbstractFilter {
 
 				case TEForEach(f):
 					// First process the loop variable declaration (to add candidates)
-					loop(f.iter.eit);
+					switch f.iter.eit.kind {
+						case TEVars(_, vars):
+							for (decl in vars) {
+								if (decl.init != null) {
+									noteMapIteratorBinding(decl.v, decl.init.expr);
+								}
+								addCandidate(decl);
+								if (decl.init != null) {
+									loop(decl.init.expr);
+								}
+							}
+						case TELocal(_, _):
+							// Skip marking shared loop vars as incompatible.
+						case _:
+							loop(f.iter.eit);
+					}
 					// Then process the iterable expression
 					loop(f.iter.eobj);
 					// Now infer loop variable type from array element type
@@ -430,12 +445,9 @@ class InferLocalVarTypes extends AbstractFilter {
 						if (info != null) {
 							// Try to infer from the iterable expression
 							var objHint = hintFromExpr(f.iter.eobj, mapValueHints, mapIteratorHints);
-							switch objHint {
-								case TTArray(elemType):
-									if (elemType != null) {
-										noteHint(info, elemType);
-									}
-								case _:
+							var elemType = elementTypeFromIterableHint(objHint);
+							if (elemType != null) {
+								noteHint(info, elemType);
 							}
 						}
 					}
@@ -484,6 +496,23 @@ class InferLocalVarTypes extends AbstractFilter {
 				info.decl.v.type = newType;
 				reportError(info.decl.syntax.name.pos, 'Inferred local var type "${info.decl.v.name}" as ${typeToString(newType)} (was ASAny)');
 			}
+		}
+	}
+
+	static function elementTypeFromIterableHint(hint:Null<TType>):Null<TType> {
+		return switch hint {
+			case TTArray(elemType):
+				elemType;
+			case TTVector(elemType):
+				elemType;
+			case TTDictionary(_, valueType):
+				valueType;
+			case TTObject(valueType):
+				valueType;
+			case TTXMLList:
+				TTXML;
+			case _:
+				null;
 		}
 	}
 

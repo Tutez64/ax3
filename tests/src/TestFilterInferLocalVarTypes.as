@@ -122,6 +122,22 @@ package {
                 var len:int = item.length;
                 var first:int = item[0];
             }
+
+            // Case 14: Loop variable type inference from Vector elements
+            var helpers:Vector.<LocalVarTypeHelper> = new Vector.<LocalVarTypeHelper>();
+            helpers.push(new LocalVarTypeHelper());
+            for each (var helper in helpers) {
+                var helperValue:int = helper.value;
+            }
+
+            var sharedHelper:*;
+            for each (sharedHelper in helpers) {
+                var sharedValue:int = sharedHelper.value;
+            }
         }
     }
+}
+
+class LocalVarTypeHelper {
+    public var value:int = 1;
 }
