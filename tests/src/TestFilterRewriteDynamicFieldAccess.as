@@ -11,6 +11,16 @@ package {
             mc.worldmap = new MovieClip();
             var value:* = mc.worldmap;
             var ctor:Class = mc.constructor;
+
+            // Dynamic access via a typed holder (x.root) should still cast to ASAny in Haxe output.
+            var holder:RootHolder = new RootHolder();
+            holder.root = new MovieClip();
+            holder.root.selectionFrame = new MovieClip();
+            holder.root.selectionFrame.visible = false;
         }
     }
+}
+
+class RootHolder {
+    public var root:MovieClip;
 }
