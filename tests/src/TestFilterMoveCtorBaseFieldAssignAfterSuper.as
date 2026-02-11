@@ -2,7 +2,7 @@
  * Test case for MoveCtorBaseFieldAssignAfterSuper filter.
  *
  * Expectations:
- * - Assignments to base class fields that appear before super() are moved after super().
+ * - Only trailing assignments to base class fields immediately before super() are moved after super().
  * - Assignments to subclass fields before super() stay in place.
  * - Assignments nested inside other statements (like if blocks) are not moved.
  * - Constructors where super() is already first remain unchanged.
@@ -26,13 +26,13 @@ class ChildWithPreSuperBaseAssigns extends BaseWithFields {
     public var ownA:int = 0;
 
     public function ChildWithPreSuperBaseAssigns(v:int) {
-        baseA = v;       // should move after super()
-        this.baseB = 2;  // should move after super()
-        super.baseA = 6; // should move after super() (explicit super access)
+        baseA = v;       // should stay before super() (not trailing)
         ownA = 3;        // should stay before super()
         if (v > 0) {
             baseA = 4;   // should stay before super() (nested statement)
         }
+        this.baseB = 2;  // should move after super() (trailing)
+        super.baseA = 6; // should move after super() (trailing, explicit super access)
         super();
         baseA = 5;       // should stay after super()
     }

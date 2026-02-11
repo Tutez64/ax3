@@ -35,8 +35,15 @@ class MoveCtorBaseFieldAssignAfterSuper extends AbstractFilter {
 					var after = block.exprs.slice(superIndex + 1);
 					var keepBefore:Array<TBlockExpr> = [];
 					var moveAfter:Array<TBlockExpr> = [];
-					for (expr in before) {
-						if (isAssignToBaseField(expr.expr, currentClass)) {
+					var lastNonSimpleIndex = -1;
+					for (i in 0...before.length) {
+						if (!isSimpleExpr(before[i].expr)) {
+							lastNonSimpleIndex = i;
+						}
+					}
+					for (i in 0...before.length) {
+						var expr = before[i];
+						if (i > lastNonSimpleIndex && isAssignToBaseField(expr.expr, currentClass)) {
 							moveAfter.push(expr);
 						} else {
 							keepBefore.push(expr);
@@ -54,6 +61,15 @@ class MoveCtorBaseFieldAssignAfterSuper extends AbstractFilter {
 				}
 			case _:
 				e;
+		}
+	}
+
+	static function isSimpleExpr(e:TExpr):Bool {
+		return switch e.kind {
+			case TEParens(_, inner, _): isSimpleExpr(inner);
+			case TEVars(_, _): true;
+			case TEBinop(_, OpAssign(_), _): true;
+			case _: false;
 		}
 	}
 
