@@ -8,8 +8,9 @@ class ASCompat {
 	public static inline final MAX_INT = 2147483647;
 	public static inline final MIN_INT = -2147483648;
 
-	public static inline final MAX_FLOAT = 1.79e+308;
-	public static inline final MIN_FLOAT = -1.79E+308;
+	public static inline final MAX_FLOAT = 1.7976931348623157e+308;
+	// Represents the smallest positive Number value in AS3 (Number.MIN_VALUE)
+	public static inline final MIN_FLOAT = 4.9406564584124654e-324;
 
 	public static inline function checkNullIteratee<T>(v:Null<T>, ?pos:haxe.PosInfos):Bool {
 		if (v == null) {
