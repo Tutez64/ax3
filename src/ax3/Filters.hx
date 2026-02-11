@@ -90,6 +90,7 @@ class Filters {
 			new FixIteratorCasts(context),
 			new FixDowncastRetypes(context),
 			new NamespacedToPublic(context),
+			new MoveCtorBaseFieldAssignAfterSuper(context),
 			new MoveFieldInits(context),
 			new HoistLocalDecls(context),
 			new VarInits(context),
