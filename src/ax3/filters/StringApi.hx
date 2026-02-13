@@ -148,9 +148,36 @@ class StringApi extends AbstractFilter {
 			case TEField({type: TTString}, name = "replace" | "match" | "split" | "concat" | "search" | "localeCompare", _):
 				throwError(exprPos(e), "closure on String." + name);
 
+			case TECall({kind: TEField(fieldObject = {kind: TOExplicit(dot, eObject)}, methodName = "toUpperCase" | "toLowerCase" | "toLocaleUpperCase" | "toLocaleLowerCase" | "charAt" | "charCodeAt" | "substr" | "substring", fieldToken)}, args)
+				if (isEffectivelyAny(eObject)):
+				var eCoerced = coerceToString(processExpr(eObject));
+				var newFieldObj:TFieldObject = {kind: TOExplicit(dot, eCoerced), type: TTString};
+				var newMethod = mk(TEField(newFieldObj, methodName, fieldToken), TTFun([], TTString), TTFun([], TTString));
+				processExpr(e.with(kind = TECall(newMethod, args)));
+
 			case _:
 				mapExpr(processExpr, e);
 		}
+	}
+
+	function isEffectivelyAny(e:TExpr):Bool {
+		if (e.type != TTAny) return false;
+
+		function getBaseType(e:TExpr):TType {
+			return switch e.kind {
+				case TELocal(_, v): v.type;
+				case TEField(fobj, _, _):
+					switch fobj.kind {
+						case TOExplicit(_, inner): getBaseType(inner);
+						case TOImplicitThis(cls) | TOImplicitClass(cls): TTInst(cls);
+					}
+				case TEParens(_, inner, _): getBaseType(inner);
+				case _: e.type;
+			}
+		}
+
+		var baseType = getBaseType(e);
+		return baseType.match(TTAny | TTObject(_));
 	}
 
 	function coerceToString(e:TExpr):TExpr {

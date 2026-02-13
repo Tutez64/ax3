@@ -39,7 +39,18 @@ package {
             regText = regText.replace("y", false);
             regText = regText.replace("z", null);
 
-            if (sliceAll == null || substrAll == null || substringAll == null || concatText == null || compareValue == 0) {
+            // Calling string methods on ASAny/Object should be coerced to String to ensure Haxe
+            // uses String methods instead of reflection/dynamic dispatch (which can return [OBJECT GLOBAL]).
+            var anyObj:Object = { Name: "hero" };
+            var upperAny:String = anyObj.Name.toUpperCase();
+            var charAny:String = anyObj.Name.charAt(0);
+
+            // Calling string methods on typed objects should NOT be coerced.
+            // URLRequestHeader.name is known as String.
+            var header:flash.net.URLRequestHeader = new flash.net.URLRequestHeader("x-id", "val");
+            var lowerTyped:String = header.name.toLowerCase();
+
+            if (sliceAll == null || substrAll == null || substringAll == null || concatText == null || compareValue == 0 || upperAny == null || charAny == null || lowerTyped == null) {
                 trace(sliceAll, substrAll, substringAll, concatText, compareValue);
             }
         }
