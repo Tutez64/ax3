@@ -6,10 +6,53 @@ package ax3.filters;
 class CoerceToBool extends AbstractFilter {
 	override function processExpr(e:TExpr):TExpr {
 		e = mapExpr(processExpr, e);
+		
+		// Handle !array -> array == null
+		switch e.kind {
+			case TEPreUnop(PreNot(notToken), inner) if (isArrayLike(inner.type)):
+				// Transform !array into array == null
+				var trail = removeTrailingTrivia(inner);
+				var equalsToken = mkTokenWithSpaces(TkEqualsEquals, "==");
+				equalsToken.leadTrivia = notToken.leadTrivia.concat(notToken.trailTrivia).concat(equalsToken.leadTrivia);
+				return mk(TEBinop(inner.with(expectedType = inner.type), OpEquals(equalsToken), mkNullExpr(inner.type, [], trail)), TTBoolean, TTBoolean);
+			case _:
+		}
+		
 		if (e.expectedType == TTBoolean && e.type != TTBoolean) {
+			// Don't coerce if this is already a null comparison
+			if (isNullComparison(e)) {
+				return e;
+			}
 			return coerce(e);
 		} else {
 			return e;
+		}
+	}
+
+	static function isNullComparison(e:TExpr):Bool {
+		return switch e.kind {
+			case TEBinop(_, OpEquals(_) | OpNotEquals(_) | OpStrictEquals(_) | OpNotStrictEquals(_), {kind: TELiteral(TLNull(_))}):
+				true;
+			case TEBinop({kind: TELiteral(TLNull(_))}, OpEquals(_) | OpNotEquals(_) | OpStrictEquals(_) | OpNotStrictEquals(_), _):
+				true;
+			case _:
+				false;
+		}
+	}
+
+	public function processNegation(e:TExpr):TExpr {
+		// Handle !array (truthiness check) -> array == null
+		if (isArrayLike(e.type)) {
+			var trail = removeTrailingTrivia(e);
+			return mk(TEBinop(e.with(expectedType = e.type), OpEquals(mkTokenWithSpaces(TkEqualsEquals, "==")), mkNullExpr(e.type, [], trail)), TTBoolean, TTBoolean);
+		}
+		return null;
+	}
+
+	static function isArrayLike(t:TType):Bool {
+		return switch t {
+			case TTArray(_) | TTVector(_): true;
+			case _: false;
 		}
 	}
 
