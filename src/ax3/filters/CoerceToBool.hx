@@ -6,7 +6,7 @@ package ax3.filters;
 class CoerceToBool extends AbstractFilter {
 	override function processExpr(e:TExpr):TExpr {
 		e = mapExpr(processExpr, e);
-		
+
 		// Handle !array -> array == null
 		switch e.kind {
 			case TEPreUnop(PreNot(notToken), inner) if (isArrayLike(inner.type)):
@@ -17,7 +17,10 @@ class CoerceToBool extends AbstractFilter {
 				return mk(TEBinop(inner.with(expectedType = inner.type), OpEquals(equalsToken), mkNullExpr(inner.type, [], trail)), TTBoolean, TTBoolean);
 			case _:
 		}
-		
+
+		// Handle conditions in control structures - check if this expression is a condition
+		e = processConditionExpr(e);
+
 		if (e.expectedType == TTBoolean && e.type != TTBoolean) {
 			// Don't coerce if this is already a null comparison
 			if (isNullComparison(e)) {
@@ -26,6 +29,76 @@ class CoerceToBool extends AbstractFilter {
 			return coerce(e);
 		} else {
 			return e;
+		}
+	}
+
+	/**
+	 * Check if an expression is used as a condition in control structures
+	 * and coerce it to bool if needed
+	 */
+	function processConditionExpr(e:TExpr):TExpr {
+		return switch e.kind {
+			// if (condition)
+			case TEIf(i):
+				var newCond = coerceIfReference(i.econd);
+				if (newCond != i.econd) {
+					i.econd = newCond;
+				}
+				e;
+
+			// while (condition)
+			case TEWhile(w):
+				var newCond = coerceIfReference(w.cond);
+				if (newCond != w.cond) {
+					w.cond = newCond;
+				}
+				e;
+
+			// do { ... } while (condition)
+			case TEDoWhile(w):
+				var newCond = coerceIfReference(w.cond);
+				if (newCond != w.cond) {
+					w.cond = newCond;
+				}
+				e;
+
+			// for (...; condition; ...)
+			case TEFor(f):
+				if (f.econd != null) {
+					var newCond = coerceIfReference(f.econd);
+					if (newCond != f.econd) {
+						f.econd = newCond;
+					}
+				}
+				e;
+
+			// switch (expression) - not a condition, but the switch value
+			// We don't coerce the switch value, only cases
+
+			case _:
+				e;
+		}
+	}
+
+	/**
+	 * Coerce an expression to bool if it's a reference type
+	 */
+	function coerceIfReference(e:TExpr):TExpr {
+		if (e.type != TTBoolean && isReferenceType(e.type)) {
+			if (!isNullComparison(e)) {
+				return coerce(e.with(expectedType = TTBoolean));
+			}
+		}
+		return e;
+	}
+
+	/**
+	 * Check if a type is a reference type that should be compared to null
+	 */
+	function isReferenceType(t:TType):Bool {
+		return switch t {
+			case TTFunction | TTFun(_) | TTClass | TTInst(_) | TTStatic(_) | TTArray(_) | TTVector(_) | TTRegExp | TTXML | TTXMLList | TTDictionary(_, _): true;
+			case _: false;
 		}
 	}
 
