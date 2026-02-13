@@ -22,6 +22,39 @@ class InferLocalVarTypes extends AbstractFilter {
 	var fieldMapValueHints:Map<String, MapValueInfo> = null;
 	var currentClass:Null<TClassOrInterfaceDecl> = null;
 
+	static final fieldOverrides:Array<{owner:String, name:String, target:String}> = [
+		// Some externs expose `responseHeaders` as Array<Dynamic>, but runtime values are URLRequestHeader items.
+		{owner: "flash.events.HTTPStatusEvent", name: "responseHeaders", target: "Array<flash.net.URLRequestHeader>"},
+		{owner: "openfl.events.HTTPStatusEvent", name: "responseHeaders", target: "Array<flash.net.URLRequestHeader>"}
+	];
+
+	function getFieldOverrideType(obj:TFieldObject, fieldName:String):Null<TType> {
+		var cls = switch obj.type {
+			case TTInst(c) | TTStatic(c): c;
+			case _: null;
+		};
+		if (cls == null) return null;
+
+		var fqn = classFqn(cls);
+		for (rule in fieldOverrides) {
+			if (rule.name != fieldName) continue;
+			if (!ownerMatches(cls, fqn, rule.owner)) continue;
+			return tree.getType(rule.target);
+		}
+		return null;
+	}
+
+	function classFqn(c:TClassOrInterfaceDecl):String {
+		var pack = c.parentModule.parentPack.name;
+		return pack == "" ? c.name : pack + "." + c.name;
+	}
+
+	function ownerMatches(cls:TClassOrInterfaceDecl, fqn:String, owner:String):Bool {
+		if (owner == fqn) return true;
+		if (owner.indexOf(".") == -1) return owner == cls.name;
+		return false;
+	}
+
 	override function processClass(c:TClassOrInterfaceDecl) {
 		fieldMapValueHints = new Map();
 		collectFieldMapValueHints(c, fieldMapValueHints);
@@ -516,7 +549,15 @@ class InferLocalVarTypes extends AbstractFilter {
 		}
 	}
 
-	static function hintFromExpr(e:TExpr, mapValueHints:Map<String, MapValueInfo>, mapIteratorHints:Map<String, String>):Null<TType> {
+	function hintFromExpr(e:TExpr, mapValueHints:Map<String, MapValueInfo>, mapIteratorHints:Map<String, String>):Null<TType> {
+		// Check for field overrides first
+		switch e.kind {
+			case TEField(obj, name, _):
+				var overrideType = getFieldOverrideType(obj, name);
+				if (overrideType != null) return overrideType;
+			case _:
+		}
+
 		// For array declarations, try to find common type even if elements have known types
 		switch e.kind {
 			case TEArrayDecl(arr):
@@ -623,7 +664,7 @@ class InferLocalVarTypes extends AbstractFilter {
 		return null;
 	}
 
-	static function hintFromMapCall(e:TExpr, mapValueHints:Map<String, MapValueInfo>, mapIteratorHints:Map<String, String>):Null<TType> {
+	function hintFromMapCall(e:TExpr, mapValueHints:Map<String, MapValueInfo>, mapIteratorHints:Map<String, String>):Null<TType> {
 		switch e.kind {
 			case TECall(eobj, _):
 				switch eobj.kind {
@@ -657,7 +698,7 @@ class InferLocalVarTypes extends AbstractFilter {
 		return null;
 	}
 
-	static function collectFieldMapValueHints(c:TClassOrInterfaceDecl, mapValueHints:Map<String, MapValueInfo>) {
+	function collectFieldMapValueHints(c:TClassOrInterfaceDecl, mapValueHints:Map<String, MapValueInfo>) {
 		function loopExpr(e:TExpr) {
 			switch e.kind {
 				case TECall(eobj, args):

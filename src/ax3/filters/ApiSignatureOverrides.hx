@@ -21,6 +21,12 @@ private typedef CallOverride = {
 	var isCtor:Bool;
 }
 
+private typedef FieldOverride = {
+	var owner:String;
+	var name:String;
+	var target:String;
+}
+
 class ApiSignatureOverrides extends AbstractFilter {
 	static final overrides:Array<CallOverride> = [
 		// TextFormat(color) accepts Object in SWC, but Haxe expects Int/Null<Int>
@@ -44,6 +50,11 @@ class ApiSignatureOverrides extends AbstractFilter {
 			{index: 1, target: TTInt, coerce: ToInt, allowNull: false}
 		]}
 	];
+	static final fieldOverrides:Array<FieldOverride> = [
+		// Some externs expose `responseHeaders` as Array<Dynamic>, but runtime values are URLRequestHeader items.
+		{owner: "flash.events.HTTPStatusEvent", name: "responseHeaders", target: "Array<flash.net.URLRequestHeader>"},
+		{owner: "openfl.events.HTTPStatusEvent", name: "responseHeaders", target: "Array<flash.net.URLRequestHeader>"}
+	];
 
 	override function processExpr(e:TExpr):TExpr {
 		e = mapExpr(processExpr, e);
@@ -54,6 +65,8 @@ class ApiSignatureOverrides extends AbstractFilter {
 			case TECall(eobj, args):
 				var nextArgs = applyCallOverrides(eobj, args);
 				if (nextArgs == args) e else e.with(kind = TECall(eobj, nextArgs));
+			case TEField(obj, name, _):
+				applyFieldOverride(e, obj, name);
 			case _:
 				e;
 		}
@@ -158,6 +171,19 @@ class ApiSignatureOverrides extends AbstractFilter {
 		processLeadingToken(tok -> tok.leadTrivia = lead.concat(tok.leadTrivia), wrapped);
 		processTrailingToken(tok -> tok.trailTrivia = tok.trailTrivia.concat(trail), wrapped);
 		return wrapped;
+	}
+
+	function applyFieldOverride(e:TExpr, obj:TFieldObject, name:String):TExpr {
+		var cls = typeToClass(obj.type);
+		if (cls == null) return e;
+		var fqn = classFqn(cls);
+		for (rule in fieldOverrides) {
+			if (rule.name != name || !ownerMatches(cls, fqn, rule.owner)) continue;
+			var targetType = tree.getType(rule.target);
+			if (e.type == targetType) return e;
+			return e.with(type = targetType, expectedType = targetType);
+		}
+		return e;
 	}
 
 	static function extractCallTarget(eobj:TExpr):Null<{cls:TClassOrInterfaceDecl, name:String}> {

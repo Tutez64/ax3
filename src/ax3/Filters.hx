@@ -51,6 +51,7 @@ class Filters {
 		]);
 		if (cloneExprSmokeLate != null) filters.push(cloneExprSmokeLate);
 		filters = filters.concat([
+			new ApiSignatureOverrides(context),
 			new RewriteForIn(context),
 			new RewriteHasOwnProperty(context),
 			new NumberToInt(context),
@@ -76,7 +77,7 @@ class Filters {
 			new StringApi(context),
 			new TextFieldApi(context),
 			new DisplayObjectContainerApi(context),
-			new ApiSignatureOverrides(context),
+			new ApiSignatureOverrides(context), // This second appearance is useful
 			new FileModeApi(context),
 			new ColorMatrixFilterApi(context),
 			new NumberApi(context),
