@@ -25,7 +25,10 @@ class InferLocalVarTypes extends AbstractFilter {
 	static final fieldOverrides:Array<{owner:String, name:String, target:String}> = [
 		// Some externs expose `responseHeaders` as Array<Dynamic>, but runtime values are URLRequestHeader items.
 		{owner: "flash.events.HTTPStatusEvent", name: "responseHeaders", target: "Array<flash.net.URLRequestHeader>"},
-		{owner: "openfl.events.HTTPStatusEvent", name: "responseHeaders", target: "Array<flash.net.URLRequestHeader>"}
+		{owner: "openfl.events.HTTPStatusEvent", name: "responseHeaders", target: "Array<flash.net.URLRequestHeader>"},
+		// SWC types currentLabels as Array, but runtime values are FrameLabel items.
+		{owner: "flash.display.MovieClip", name: "currentLabels", target: "Array<flash.display.FrameLabel>"},
+		{owner: "openfl.display.MovieClip", name: "currentLabels", target: "Array<openfl.display.FrameLabel>"}
 	];
 
 	function getFieldOverrideType(obj:TFieldObject, fieldName:String):Null<TType> {
