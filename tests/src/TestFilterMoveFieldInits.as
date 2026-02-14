@@ -6,6 +6,7 @@
  * - Instance field init calling an instance method.
  * - Field init that does not touch this (should stay).
  * - Derived class with a super() call.
+ * - Field init depending on base class field assigned before super().
  */
 package {
     public class TestFilterMoveFieldInits extends BaseMoveFieldInits {
@@ -28,4 +29,33 @@ package {
 class BaseMoveFieldInits {
     public function BaseMoveFieldInits() {
     }
+}
+
+// Test case: field init depending on base class field assigned before super()
+// The field init must be inserted BEFORE super() to preserve AS3 semantics
+class TestMoveFieldInitsBeforeSuper extends BaseWithProtectedField {
+    protected var mHelper:Helper;
+    // This field init depends on mBaseField which is assigned before super()
+    // Therefore it must be initialized BEFORE super() is called
+    protected var mComponent:Component = new Component(mBaseField);
+
+    public function TestMoveFieldInitsBeforeSuper(param1:int) {
+        mBaseField = param1;
+        super(param1);
+    }
+}
+
+class BaseWithProtectedField {
+    protected var mBaseField:int;
+
+    public function BaseWithProtectedField(val:int) {
+        // In AS3, child field inits happen before this constructor runs
+        // So mComponent is already initialized here
+    }
+}
+
+class Helper {}
+
+class Component {
+    public function Component(val:int) {}
 }

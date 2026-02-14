@@ -86,24 +86,51 @@ class MoveFieldInits extends AbstractFilter {
 				return expr;
 		};
 
-		var insertAt = 0;
+		// Find the position of super() call
+		var superIndex = -1;
 		for (i in 0...block.exprs.length) {
 			if (isSuperCall(block.exprs[i].expr)) {
-				insertAt = i + 1;
+				superIndex = i;
 				break;
 			}
 		}
+
+		// Collect field dependencies from all pending initializations
 		var deps = new Map<String, Bool>();
 		for (item in pending) {
 			collectFieldDeps(item.init.expr, deps);
 		}
-		if (deps.keys().hasNext()) {
-			for (i in 0...block.exprs.length) {
-				if (assignsToDeps(block.exprs[i].expr, deps)) {
-					if (i + 1 > insertAt) {
-						insertAt = i + 1;
+
+		// Determine insert position
+		var insertAt = 0;
+		if (superIndex >= 0) {
+			// Check if any dependencies are assigned before super()
+			var hasDepsBeforeSuper = false;
+			if (deps.keys().hasNext()) {
+				for (i in 0...superIndex) {
+					if (assignsToDeps(block.exprs[i].expr, deps)) {
+						hasDepsBeforeSuper = true;
+						break;
 					}
 				}
+			}
+
+			if (hasDepsBeforeSuper) {
+				// If dependencies are assigned before super(), we must insert before super()
+				// to preserve AS3 semantics (field inits happen before parent constructor)
+				insertAt = superIndex;
+				// Find the earliest position after all dependency assignments
+				var i = superIndex - 1;
+				while (i >= 0) {
+					if (assignsToDeps(block.exprs[i].expr, deps)) {
+						insertAt = i + 1;
+						break;
+					}
+					i--;
+				}
+			} else {
+				// No dependencies before super(), insert after super() (default behavior)
+				insertAt = superIndex + 1;
 			}
 		}
 

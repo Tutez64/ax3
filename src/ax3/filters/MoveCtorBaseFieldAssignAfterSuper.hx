@@ -2,11 +2,16 @@ package ax3.filters;
 
 class MoveCtorBaseFieldAssignAfterSuper extends AbstractFilter {
 	override function processClass(c:TClassOrInterfaceDecl) {
+		// Collect field dependencies from instance field initializations in this class
+		// These fields will be moved to the constructor by MoveFieldInits,
+		// so we need to know if they depend on base class fields
+		var fieldInitDeps = collectFieldInitDeps(c);
+
 		for (m in c.members) {
 			switch (m) {
 				case TMField({kind: TFFun(f)}) if (isCtorName(f.name, c.name)):
 					if (f.fun.expr != null) {
-						f.fun.expr = moveBaseAssignsAfterSuper(f.fun.expr, c);
+						f.fun.expr = moveBaseAssignsAfterSuper(f.fun.expr, c, fieldInitDeps);
 					}
 					break;
 				case _:
@@ -18,7 +23,36 @@ class MoveCtorBaseFieldAssignAfterSuper extends AbstractFilter {
 		return name == "new" || name == className;
 	}
 
-	function moveBaseAssignsAfterSuper(e:TExpr, currentClass:TClassOrInterfaceDecl):TExpr {
+	/**
+	 * Collect field names that are used in instance field initializations.
+	 * These are fields declared in this class that have initializers using other fields.
+	 */
+	function collectFieldInitDeps(c:TClassOrInterfaceDecl):Map<String, Bool> {
+		var deps = new Map<String, Bool>();
+		for (m in c.members) {
+			switch m {
+				case TMField(field):
+					switch field.kind {
+						case TFVar(v) if (v.init != null):
+							collectDepsFromExpr(v.init.expr, deps);
+						case _:
+					}
+				case _:
+			}
+		}
+		return deps;
+	}
+
+	function collectDepsFromExpr(e:TExpr, deps:Map<String, Bool>):Void {
+		switch e.kind {
+			case TEField(obj, name, _) if (isThisObject(obj)):
+				deps[name] = true;
+			case _:
+				iterExpr(e2 -> collectDepsFromExpr(e2, deps), e);
+		}
+	}
+
+	function moveBaseAssignsAfterSuper(e:TExpr, currentClass:TClassOrInterfaceDecl, fieldInitDeps:Map<String, Bool>):TExpr {
 		return switch e.kind {
 			case TEBlock(block):
 				var superIndex = -1;
@@ -43,7 +77,7 @@ class MoveCtorBaseFieldAssignAfterSuper extends AbstractFilter {
 					}
 					for (i in 0...before.length) {
 						var expr = before[i];
-						if (i > lastNonSimpleIndex && isAssignToBaseField(expr.expr, currentClass)) {
+						if (i > lastNonSimpleIndex && isAssignToBaseField(expr.expr, currentClass, fieldInitDeps)) {
 							moveAfter.push(expr);
 						} else {
 							keepBefore.push(expr);
@@ -81,14 +115,24 @@ class MoveCtorBaseFieldAssignAfterSuper extends AbstractFilter {
 		}
 	}
 
-	static function isAssignToBaseField(e:TExpr, currentClass:TClassOrInterfaceDecl):Bool {
+	/**
+	 * Check if an expression is an assignment to a base class field.
+	 * Returns true only if the field is inherited AND not needed by child class field initializations.
+	 */
+	function isAssignToBaseField(e:TExpr, currentClass:TClassOrInterfaceDecl, fieldInitDeps:Map<String, Bool>):Bool {
 		return switch e.kind {
-			case TEParens(_, inner, _): isAssignToBaseField(inner, currentClass);
+			case TEParens(_, inner, _): isAssignToBaseField(inner, currentClass, fieldInitDeps);
 			case TEBinop(left, OpAssign(_), _):
 				switch left.kind {
 					case TEField(obj, name, _) if (isThisObject(obj)):
 						var found = currentClass.findFieldInHierarchy(name, false);
-						found != null && found.declaringClass != currentClass;
+						// It's a base field if it's declared in a parent class
+						if (found != null && found.declaringClass != currentClass) {
+							// BUT don't move it if child class field initializations depend on it
+							!fieldInitDeps.exists(name);
+						} else {
+							false;
+						}
 					case _:
 						false;
 				}
