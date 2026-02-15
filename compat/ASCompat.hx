@@ -75,10 +75,14 @@ class ASCompat {
 	// but AS3 Number(undefined) = NaN while Number(null) = 0
 	public static inline function toNumberField(obj:Dynamic, fieldName:String):Float {
 		#if flash
-		// Check for null first - __in__ operator doesn't work with null in Flash
-		if (obj == null) return Math.NaN;
-		// Use "in" operator to check if field exists before accessing it
-		return untyped __in__(fieldName, obj) ? untyped __global__["Number"](obj[fieldName]) : Math.NaN;
+		// 1. Use Reflect.getProperty to ensure Haxe getters are called correctly.
+		// Standard untyped access obj[fieldName] might return the raw backing field (0) instead of the getter value.
+		var v:Dynamic = (obj == null) ? null : Reflect.getProperty(obj, fieldName);
+		
+		// 2. To match AS3, missing fields (undefined) must return NaN, but existing null fields must return 0.
+		// Since both come back as null in Haxe, we use the __in__ operator to check existence.
+		// return (missing) ? NaN : Number(v)
+		return if (obj == null || (v == null && !untyped __in__(fieldName, obj))) Math.NaN else untyped __global__["Number"](v);
 		#else
 		// For JS, use Reflect to check field existence and get value
 		if (obj == null || !Reflect.hasField(obj, fieldName)) return Math.NaN;
