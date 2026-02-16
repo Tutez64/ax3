@@ -7,6 +7,7 @@
  * reverse/map/some route to compat helpers for Array/Vector.
  * untyped concat arguments should report a non-blocking error.
  * Vector sort/splice paths are covered.
+ * Array methods on TTAny/ASAny objects are transformed to ASCompat.dyn* calls.
  */
 package {
     public class TestFilterArrayApi {
@@ -91,6 +92,50 @@ package {
             vec2.map(function(item:int, index:int, vector:Vector.<int>):void {
                 vec2.push(item);
             }, this);
+
+            // Test array methods on TTAny/ASAny objects (dynamic array access)
+            // These should be transformed to ASCompat.dyn* calls
+            testAnyArrayMethods();
+        }
+
+        // Test calling array methods on dynamically-typed arrays (TTAny)
+        private function testAnyArrayMethods():void {
+            var arr:* = [];
+            arr.push(1);  // Should be transformed to ASCompat.dynPush(arr, 1)
+            arr.push(2, 3);  // Should be transformed to ASCompat.dynPushMultiple(arr, 2, [3])
+
+            var arr2:* = [1, 2, 3];
+            var popped:* = arr2.pop();  // Should be transformed to ASCompat.dynPop(arr2)
+            var shifted:* = arr2.shift();  // Should be transformed to ASCompat.dynShift(arr2)
+
+            var arr3:* = [];
+            arr3.unshift(1);  // Should be transformed to ASCompat.dynUnshift(arr3, 1)
+            arr3.unshift(2, 3);  // Should be transformed to ASCompat.dynUnshiftMultiple(arr3, 2, [3])
+
+            var arr4:* = [1, 2, 3];
+            arr4.reverse();  // Should be transformed to ASCompat.dynReverse(arr4)
+
+            var arr5:* = [1, 2, 3, 4, 5];
+            arr5.splice(1, 2);  // Should be transformed to ASCompat.dynSplice(arr5, 1, 2)
+            arr5.splice(1, 0, 10);  // Should be transformed to ASCompat.dynSplice(arr5, 1, 0, [10])
+
+            var arr6:* = [1, 2];
+            var concatResult:* = arr6.concat([3, 4]);  // Should be transformed to ASCompat.dynConcat(arr6, [3, 4])
+
+            var arr7:* = [1, 2, 3];
+            var joined:String = arr7.join(",");  // Should be transformed to ASCompat.dynJoin(arr7, ",")
+
+            var arr8:* = [1, 2, 3, 4, 5];
+            var sliced:* = arr8.slice(1, 3);  // Should be transformed to ASCompat.dynSlice(arr8, 1, 3)
+
+            // Test accessing array from a multi-dimensional array with any type
+            var matrix:Array = [];
+            matrix[0] = [];
+            matrix[0].push(new Object());  // matrix[0] is TTAny, should use dynPush
+
+            // Test with array retrieved from an Object (which is TTObject(TTAny))
+            var obj:Object = {arr: []};
+            obj.arr.push(1);  // obj.arr is TTObject(TTAny), should use dynPush
         }
     }
 }

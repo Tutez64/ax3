@@ -418,6 +418,351 @@ class ASCompat {
 		#end
 	}
 
+	// -------------------------------------------------------------------------
+	// Dynamic array methods - for calling array methods on TTAny/ASAny objects
+	// These methods handle array operations on dynamically-typed objects
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Calls push() on a dynamically-typed object that may be an Array or ASArrayBase.
+	 * Returns the new length of the array.
+	 */
+	public static function dynPush(obj:Dynamic, value:Dynamic):UInt {
+		if (obj == null) {
+			return 0;
+		}
+		if (Std.isOfType(obj, ASArrayBase)) {
+			return (cast obj : ASArrayBase).push(value);
+		}
+		if (Std.isOfType(obj, Array)) {
+			var arr:Array<Dynamic> = cast obj;
+			arr.push(value);
+			return arr.length;
+		}
+		// Fallback: try to call push via Reflect
+		var pushMethod = Reflect.field(obj, "push");
+		if (pushMethod != null && Reflect.isFunction(pushMethod)) {
+			return Reflect.callMethod(obj, pushMethod, [value]);
+		}
+		return 0;
+	}
+
+	/**
+	 * Calls push() with multiple arguments on a dynamically-typed object.
+	 * Returns the new length of the array.
+	 */
+	public static function dynPushMultiple(obj:Dynamic, first:Dynamic, rest:Array<Dynamic>):UInt {
+		if (obj == null) {
+			return 0;
+		}
+		if (Std.isOfType(obj, ASArrayBase)) {
+			var arr:ASArrayBase = cast obj;
+			arr.push(first);
+			for (v in rest) {
+				arr.push(v);
+			}
+			return arr.length;
+		}
+		if (Std.isOfType(obj, Array)) {
+			var arr:Array<Dynamic> = cast obj;
+			arr.push(first);
+			for (v in rest) {
+				arr.push(v);
+			}
+			return arr.length;
+		}
+		// Fallback: try to call push via Reflect
+		var pushMethod = Reflect.field(obj, "push");
+		if (pushMethod != null && Reflect.isFunction(pushMethod)) {
+			var args = [first].concat(rest);
+			return Reflect.callMethod(obj, pushMethod, args);
+		}
+		return 0;
+	}
+
+	/**
+	 * Calls pop() on a dynamically-typed object that may be an Array or ASArrayBase.
+	 * Returns the removed element, or null if the array is empty or obj is null.
+	 */
+	public static function dynPop(obj:Dynamic):Dynamic {
+		if (obj == null) {
+			return null;
+		}
+		if (Std.isOfType(obj, ASArrayBase)) {
+			return (cast obj : ASArrayBase).pop();
+		}
+		if (Std.isOfType(obj, Array)) {
+			return (cast obj : Array<Dynamic>).pop();
+		}
+		// Fallback: try to call pop via Reflect
+		var popMethod = Reflect.field(obj, "pop");
+		if (popMethod != null && Reflect.isFunction(popMethod)) {
+			return Reflect.callMethod(obj, popMethod, []);
+		}
+		return null;
+	}
+
+	/**
+	 * Calls shift() on a dynamically-typed object that may be an Array or ASArrayBase.
+	 * Returns the removed element, or null if the array is empty or obj is null.
+	 */
+	public static function dynShift(obj:Dynamic):Dynamic {
+		if (obj == null) {
+			return null;
+		}
+		if (Std.isOfType(obj, ASArrayBase)) {
+			return (cast obj : ASArrayBase).shift();
+		}
+		if (Std.isOfType(obj, Array)) {
+			return (cast obj : Array<Dynamic>).shift();
+		}
+		// Fallback: try to call shift via Reflect
+		var shiftMethod = Reflect.field(obj, "shift");
+		if (shiftMethod != null && Reflect.isFunction(shiftMethod)) {
+			return Reflect.callMethod(obj, shiftMethod, []);
+		}
+		return null;
+	}
+
+	/**
+	 * Calls unshift() on a dynamically-typed object.
+	 * Returns the new length of the array.
+	 */
+	public static function dynUnshift(obj:Dynamic, value:Dynamic):UInt {
+		if (obj == null) {
+			return 0;
+		}
+		if (Std.isOfType(obj, ASArrayBase)) {
+			return (cast obj : ASArrayBase).unshift(value);
+		}
+		if (Std.isOfType(obj, Array)) {
+			var arr:Array<Dynamic> = cast obj;
+			arr.unshift(value);
+			return arr.length;
+		}
+		// Fallback: try to call unshift via Reflect
+		var unshiftMethod = Reflect.field(obj, "unshift");
+		if (unshiftMethod != null && Reflect.isFunction(unshiftMethod)) {
+			return Reflect.callMethod(obj, unshiftMethod, [value]);
+		}
+		return 0;
+	}
+
+	/**
+	 * Calls unshift() with multiple arguments on a dynamically-typed object.
+	 * Returns the new length of the array.
+	 */
+	public static function dynUnshiftMultiple(obj:Dynamic, first:Dynamic, rest:Array<Dynamic>):UInt {
+		if (obj == null) {
+			return 0;
+		}
+		if (Std.isOfType(obj, ASArrayBase)) {
+			var arr:ASArrayBase = cast obj;
+			// Insert in reverse order: rest first (reversed), then first
+			var i = rest.length - 1;
+			while (i >= 0) {
+				arr.unshift(rest[i]);
+				i--;
+			}
+			arr.unshift(first);
+			return arr.length;
+		}
+		if (Std.isOfType(obj, Array)) {
+			var arr:Array<Dynamic> = cast obj;
+			// Insert in reverse order: rest first (reversed), then first
+			var i = rest.length - 1;
+			while (i >= 0) {
+				arr.unshift(rest[i]);
+				i--;
+			}
+			arr.unshift(first);
+			return arr.length;
+		}
+		// Fallback: try to call unshift via Reflect
+		var unshiftMethod = Reflect.field(obj, "unshift");
+		if (unshiftMethod != null && Reflect.isFunction(unshiftMethod)) {
+			var args = [first].concat(rest);
+			return Reflect.callMethod(obj, unshiftMethod, args);
+		}
+		return 0;
+	}
+
+	/**
+	 * Returns the length of a dynamically-typed array-like object.
+	 */
+	public static function dynLength(obj:Dynamic):Int {
+		if (obj == null) {
+			return 0;
+		}
+		if (Std.isOfType(obj, ASArrayBase)) {
+			return (cast obj : ASArrayBase).length;
+		}
+		if (Std.isOfType(obj, Array)) {
+			return (cast obj : Array<Dynamic>).length;
+		}
+		// Fallback: try to access length field
+		var len = Reflect.field(obj, "length");
+		return if (len != null) Std.int(len) else 0;
+	}
+
+	/**
+	 * Calls reverse() on a dynamically-typed object.
+	 * Returns the object itself (for chaining).
+	 */
+	public static function dynReverse(obj:Dynamic):Dynamic {
+		if (obj == null) {
+			return null;
+		}
+		if (Std.isOfType(obj, ASArrayBase)) {
+			return (cast obj : ASArrayBase).reverse();
+		}
+		if (Std.isOfType(obj, Array)) {
+			(cast obj : Array<Dynamic>).reverse();
+			return obj;
+		}
+		// Fallback: try to call reverse via Reflect
+		var reverseMethod = Reflect.field(obj, "reverse");
+		if (reverseMethod != null && Reflect.isFunction(reverseMethod)) {
+			return Reflect.callMethod(obj, reverseMethod, []);
+		}
+		return obj;
+	}
+
+	/**
+	 * Calls splice() on a dynamically-typed object.
+	 */
+	public static function dynSplice(obj:Dynamic, startIndex:Int, ?deleteCount:Int, ?values:Array<Dynamic>):Dynamic {
+		if (obj == null) {
+			return null;
+		}
+		if (deleteCount == null) {
+			// Remove everything from startIndex
+			if (Std.isOfType(obj, ASArrayBase)) {
+				return (cast obj : ASArrayBase).splice(startIndex);
+			}
+			if (Std.isOfType(obj, Array)) {
+				return (cast obj : Array<Dynamic>).splice(startIndex, (cast obj : Array<Dynamic>).length);
+			}
+		} else if (values == null || values.length == 0) {
+			// Standard splice with deleteCount
+			if (Std.isOfType(obj, ASArrayBase)) {
+				return (cast obj : ASArrayBase).splice(startIndex, deleteCount);
+			}
+			if (Std.isOfType(obj, Array)) {
+				return (cast obj : Array<Dynamic>).splice(startIndex, deleteCount);
+			}
+		} else {
+			// Splice with insertion
+			if (Std.isOfType(obj, ASArrayBase)) {
+				var arr:ASArrayBase = cast obj;
+				arr.splice(startIndex, deleteCount);
+				for (i in 0...values.length) {
+					arr.insert(startIndex + i, values[i]);
+				}
+				return arr;
+			}
+			if (Std.isOfType(obj, Array)) {
+				return ASCompat.arraySplice(cast obj, startIndex, deleteCount, values);
+			}
+		}
+		// Fallback: try to call splice via Reflect
+		var spliceMethod = Reflect.field(obj, "splice");
+		if (spliceMethod != null && Reflect.isFunction(spliceMethod)) {
+			var args = [startIndex];
+			if (deleteCount != null) {
+				args.push(deleteCount);
+			}
+			if (values != null) {
+				for (v in values) {
+					args.push(v);
+				}
+			}
+			return Reflect.callMethod(obj, spliceMethod, args);
+		}
+		return null;
+	}
+
+	/**
+	 * Calls concat() on a dynamically-typed object.
+	 */
+	public static function dynConcat(obj:Dynamic, ?value:Dynamic):Dynamic {
+		if (obj == null) {
+			return null;
+		}
+		if (Std.isOfType(obj, ASArrayBase)) {
+			if (value != null) {
+				return (cast obj : ASArrayBase).concat(value);
+			} else {
+				return (cast obj : ASArrayBase).concat();
+			}
+		}
+		if (Std.isOfType(obj, Array)) {
+			var arr:Array<Dynamic> = cast obj;
+			if (value != null) {
+				return arr.concat(value);
+			} else {
+				return arr.copy();
+			}
+		}
+		// Fallback: try to call concat via Reflect
+		var concatMethod = Reflect.field(obj, "concat");
+		if (concatMethod != null && Reflect.isFunction(concatMethod)) {
+			var args = value != null ? [value] : [];
+			return Reflect.callMethod(obj, concatMethod, args);
+		}
+		return null;
+	}
+
+	/**
+	 * Calls join() on a dynamically-typed object.
+	 */
+	public static function dynJoin(obj:Dynamic, ?separator:String):String {
+		if (obj == null) {
+			return "";
+		}
+		var sep = separator != null ? separator : ",";
+		if (Std.isOfType(obj, ASArrayBase)) {
+			return (cast obj : ASArrayBase).join(sep);
+		}
+		if (Std.isOfType(obj, Array)) {
+			return (cast obj : Array<Dynamic>).join(sep);
+		}
+		// Fallback: try to call join via Reflect
+		var joinMethod = Reflect.field(obj, "join");
+		if (joinMethod != null && Reflect.isFunction(joinMethod)) {
+			return Reflect.callMethod(obj, joinMethod, [sep]);
+		}
+		return "";
+	}
+
+	/**
+	 * Calls slice() on a dynamically-typed object.
+	 */
+	public static function dynSlice(obj:Dynamic, ?startIndex:Int, ?endIndex:Int):Dynamic {
+		if (obj == null) {
+			return null;
+		}
+		if (Std.isOfType(obj, ASArrayBase)) {
+			return (cast obj : ASArrayBase).slice(startIndex, endIndex);
+		}
+		if (Std.isOfType(obj, Array)) {
+			return (cast obj : Array<Dynamic>).slice(startIndex, endIndex);
+		}
+		// Fallback: try to call slice via Reflect
+		var sliceMethod = Reflect.field(obj, "slice");
+		if (sliceMethod != null && Reflect.isFunction(sliceMethod)) {
+			var args = [];
+			if (startIndex != null) {
+				args.push(startIndex);
+				if (endIndex != null) {
+					args.push(endIndex);
+				}
+			}
+			return Reflect.callMethod(obj, sliceMethod, args);
+		}
+		return null;
+	}
+
 }
 
 class ASArray {

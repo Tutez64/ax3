@@ -258,8 +258,181 @@ class ArrayApi extends AbstractFilter {
 						e.with(kind = TECall(eCompatMethod, args.with(args = newArgs)));
 				}
 
+			// Handle array methods on TTAny/ASAny objects (dynamic array access)
+			// These are transformed to ASCompat.dyn* calls
+
+			// dynPush with single argument
+			case TECall({kind: TEField(fieldObj = {kind: TOExplicit(dot, eObj)}, "push", fieldToken)}, args) if (args.args.length == 1 && isAnyType(eObj.type)):
+				var eCompatMethod = mkBuiltin("ASCompat.dynPush", TTFunction, removeLeadingTrivia(eObj), []);
+				e.with(kind = TECall(eCompatMethod, {
+					openParen: mkOpenParen(),
+					closeParen: mkCloseParen(),
+					args: [{expr: eObj, comma: commaWithSpace}, args.args[0]]
+				}));
+
+			// dynPush with multiple arguments
+			case TECall({kind: TEField(fieldObj = {kind: TOExplicit(dot, eObj)}, "push", fieldToken)}, args) if (args.args.length > 1 && isAnyType(eObj.type)):
+				var eCompatMethod = mkBuiltin("ASCompat.dynPushMultiple", TTFunction, removeLeadingTrivia(eObj), []);
+				var restArgs = args.args.slice(1);
+				var eRestArray = mk(TEArrayDecl({
+					syntax: {openBracket: mkOpenBracket(), closeBracket: mkCloseBracket()},
+					elements: restArgs
+				}), tUntypedArray, tUntypedArray);
+				e.with(kind = TECall(eCompatMethod, {
+					openParen: mkOpenParen(),
+					closeParen: mkCloseParen(),
+					args: [
+						{expr: eObj, comma: commaWithSpace},
+						args.args[0],
+						{expr: eRestArray, comma: null}
+					]
+				}));
+
+			// dynPop
+			case TECall({kind: TEField(fieldObj = {kind: TOExplicit(dot, eObj)}, "pop", fieldToken)}, args) if (args.args.length == 0 && isAnyType(eObj.type)):
+				var eCompatMethod = mkBuiltin("ASCompat.dynPop", TTFunction, removeLeadingTrivia(eObj), []);
+				e.with(kind = TECall(eCompatMethod, {
+					openParen: mkOpenParen(),
+					closeParen: mkCloseParen(),
+					args: [{expr: eObj, comma: null}]
+				}));
+
+			// dynShift
+			case TECall({kind: TEField(fieldObj = {kind: TOExplicit(dot, eObj)}, "shift", fieldToken)}, args) if (args.args.length == 0 && isAnyType(eObj.type)):
+				var eCompatMethod = mkBuiltin("ASCompat.dynShift", TTFunction, removeLeadingTrivia(eObj), []);
+				e.with(kind = TECall(eCompatMethod, {
+					openParen: mkOpenParen(),
+					closeParen: mkCloseParen(),
+					args: [{expr: eObj, comma: null}]
+				}));
+
+			// dynUnshift with single argument
+			case TECall({kind: TEField(fieldObj = {kind: TOExplicit(dot, eObj)}, "unshift", fieldToken)}, args) if (args.args.length == 1 && isAnyType(eObj.type)):
+				var eCompatMethod = mkBuiltin("ASCompat.dynUnshift", TTFunction, removeLeadingTrivia(eObj), []);
+				e.with(kind = TECall(eCompatMethod, {
+					openParen: mkOpenParen(),
+					closeParen: mkCloseParen(),
+					args: [{expr: eObj, comma: commaWithSpace}, args.args[0]]
+				}));
+
+			// dynUnshift with multiple arguments
+			case TECall({kind: TEField(fieldObj = {kind: TOExplicit(dot, eObj)}, "unshift", fieldToken)}, args) if (args.args.length > 1 && isAnyType(eObj.type)):
+				var eCompatMethod = mkBuiltin("ASCompat.dynUnshiftMultiple", TTFunction, removeLeadingTrivia(eObj), []);
+				var restArgs = args.args.slice(1);
+				var eRestArray = mk(TEArrayDecl({
+					syntax: {openBracket: mkOpenBracket(), closeBracket: mkCloseBracket()},
+					elements: restArgs
+				}), tUntypedArray, tUntypedArray);
+				e.with(kind = TECall(eCompatMethod, {
+					openParen: mkOpenParen(),
+					closeParen: mkCloseParen(),
+					args: [
+						{expr: eObj, comma: commaWithSpace},
+						args.args[0],
+						{expr: eRestArray, comma: null}
+					]
+				}));
+
+			// dynReverse
+			case TECall({kind: TEField(fieldObj = {kind: TOExplicit(dot, eObj)}, "reverse", fieldToken)}, args) if (args.args.length == 0 && isAnyType(eObj.type)):
+				var eCompatMethod = mkBuiltin("ASCompat.dynReverse", TTFunction, removeLeadingTrivia(eObj), []);
+				e.with(kind = TECall(eCompatMethod, {
+					openParen: mkOpenParen(),
+					closeParen: mkCloseParen(),
+					args: [{expr: eObj, comma: null}]
+				}));
+
+			// dynSplice
+			case TECall({kind: TEField(fieldObj = {kind: TOExplicit(dot, eObj)}, "splice", fieldToken)}, args) if (isAnyType(eObj.type)):
+				var eCompatMethod = mkBuiltin("ASCompat.dynSplice", TTFunction, removeLeadingTrivia(eObj), []);
+				var newArgs:Array<{expr:TExpr, comma:Null<Token>}> = [{expr: eObj, comma: commaWithSpace}];
+				// startIndex
+				if (args.args.length > 0) {
+					newArgs.push(args.args[0]);
+				} else {
+					newArgs.push({expr: mk(TELiteral(TLInt(new Token(0, TkDecimalInteger, "0", [], []))), TTInt, TTInt), comma: commaWithSpace});
+				}
+				// deleteCount (optional)
+				if (args.args.length > 1) {
+					var arg = args.args[1];
+					var comma = if (args.args.length > 2) commaWithSpace else null;
+					newArgs.push({expr: arg.expr, comma: comma});
+				}
+				// values to insert (optional, as array)
+				if (args.args.length > 2) {
+					var insertArgs = args.args.slice(2);
+					var eInsertArray = mk(TEArrayDecl({
+						syntax: {openBracket: mkOpenBracket(), closeBracket: mkCloseBracket()},
+						elements: insertArgs
+					}), tUntypedArray, tUntypedArray);
+					newArgs.push({expr: eInsertArray, comma: null});
+				}
+				e.with(kind = TECall(eCompatMethod, {
+					openParen: mkOpenParen(),
+					closeParen: mkCloseParen(),
+					args: newArgs
+				}));
+
+			// dynConcat
+			case TECall({kind: TEField(fieldObj = {kind: TOExplicit(dot, eObj)}, "concat", fieldToken)}, args) if (isAnyType(eObj.type)):
+				var eCompatMethod = mkBuiltin("ASCompat.dynConcat", TTFunction, removeLeadingTrivia(eObj), []);
+				var newArgs:Array<{expr:TExpr, comma:Null<Token>}> = [{expr: eObj, comma: args.args.length > 0 ? commaWithSpace : null}];
+				if (args.args.length > 0) {
+					var arg = args.args[0];
+					newArgs.push({expr: arg.expr, comma: null});
+				}
+				e.with(kind = TECall(eCompatMethod, {
+					openParen: mkOpenParen(),
+					closeParen: mkCloseParen(),
+					args: newArgs
+				}));
+
+			// dynJoin
+			case TECall({kind: TEField(fieldObj = {kind: TOExplicit(dot, eObj)}, "join", fieldToken)}, args) if (isAnyType(eObj.type)):
+				var eCompatMethod = mkBuiltin("ASCompat.dynJoin", TTFunction, removeLeadingTrivia(eObj), []);
+				var newArgs:Array<{expr:TExpr, comma:Null<Token>}> = [{expr: eObj, comma: args.args.length > 0 ? commaWithSpace : null}];
+				if (args.args.length > 0) {
+					var arg = args.args[0];
+					newArgs.push({expr: arg.expr, comma: null});
+				}
+				e.with(kind = TECall(eCompatMethod, {
+					openParen: mkOpenParen(),
+					closeParen: mkCloseParen(),
+					args: newArgs
+				}));
+
+			// dynSlice
+			case TECall({kind: TEField(fieldObj = {kind: TOExplicit(dot, eObj)}, "slice", fieldToken)}, args) if (isAnyType(eObj.type)):
+				var eCompatMethod = mkBuiltin("ASCompat.dynSlice", TTFunction, removeLeadingTrivia(eObj), []);
+				var newArgs:Array<{expr:TExpr, comma:Null<Token>}> = [{expr: eObj, comma: commaWithSpace}];
+				// startIndex
+				if (args.args.length > 0) {
+					var arg = args.args[0];
+					newArgs.push({expr: arg.expr, comma: args.args.length > 1 ? commaWithSpace : null});
+				} else {
+					newArgs.push({expr: mk(TELiteral(TLInt(new Token(0, TkDecimalInteger, "0", [], []))), TTInt, TTInt), comma: null});
+				}
+				// endIndex (optional)
+				if (args.args.length > 1) {
+					var arg = args.args[1];
+					newArgs.push({expr: arg.expr, comma: null});
+				}
+				e.with(kind = TECall(eCompatMethod, {
+					openParen: mkOpenParen(),
+					closeParen: mkCloseParen(),
+					args: newArgs
+				}));
+
 			case _:
 				e;
+		}
+	}
+
+	static function isAnyType(t:TType):Bool {
+		return switch t {
+			case TTAny: true;
+			case TTObject(TTAny): true;
+			case _: false;
 		}
 	}
 }

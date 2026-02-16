@@ -336,6 +336,108 @@ class TestASCompat extends utest.Test {
 		isTrue(utcValue >= 0 || utcValue <= 0);
 		#end
 	}
+
+	// Tests for dynamic array methods (dyn*)
+	function testDynPush() {
+		var arr:Array<Int> = [];
+		var len = ASCompat.dynPush(arr, 1);
+		equals(1, len);
+		equals(1, arr[0]);
+
+		len = ASCompat.dynPush(arr, 2);
+		equals(2, len);
+		equals(2, arr[1]);
+	}
+
+	function testDynPushMultiple() {
+		var arr:Array<Int> = [];
+		var len = ASCompat.dynPushMultiple(arr, 1, [2, 3]);
+		equals(3, len);
+		equals(1, arr[0]);
+		equals(2, arr[1]);
+		equals(3, arr[2]);
+	}
+
+	function testDynPop() {
+		var arr:Array<Int> = [1, 2, 3];
+		var val = ASCompat.dynPop(arr);
+		equals(3, val);
+		equals(2, arr.length);
+	}
+
+	function testDynShift() {
+		var arr:Array<Int> = [1, 2, 3];
+		var val = ASCompat.dynShift(arr);
+		equals(1, val);
+		equals(2, arr.length);
+		equals(2, arr[0]);
+	}
+
+	function testDynUnshift() {
+		var arr:Array<Int> = [2, 3];
+		var len = ASCompat.dynUnshift(arr, 1);
+		equals(3, len);
+		equals(1, arr[0]);
+	}
+
+	function testDynUnshiftMultiple() {
+		var arr:Array<Int> = [3];
+		var len = ASCompat.dynUnshiftMultiple(arr, 1, [2]);
+		equals(3, len);
+		equals(1, arr[0]);
+		equals(2, arr[1]);
+		equals(3, arr[2]);
+	}
+
+	function testDynReverse() {
+		var arr:Array<Int> = [1, 2, 3];
+		ASCompat.dynReverse(arr);
+		equals(3, arr[0]);
+		equals(1, arr[2]);
+	}
+
+	function testDynSplice() {
+		var arr:Array<Int> = [1, 2, 3, 4, 5];
+		var removed = ASCompat.dynSplice(arr, 1, 2);
+		equals(2, removed.length);
+		equals(3, arr.length);
+		equals(1, arr[0]);
+		equals(4, arr[1]);
+
+		// Test with insertion
+		arr = [1, 2, 3];
+		removed = ASCompat.dynSplice(arr, 1, 1, [9, 8]);
+		equals(1, removed.length);
+		equals(4, arr.length);
+		equals(1, arr[0]);
+		equals(9, arr[1]);
+		equals(8, arr[2]);
+		equals(3, arr[3]);
+	}
+
+	function testDynConcat() {
+		var arr:Array<Int> = [1, 2];
+		var result:Array<Int> = ASCompat.dynConcat(arr, [3, 4]);
+		equals(4, result.length);
+		equals(1, result[0]);
+		equals(4, result[3]);
+		// Original array unchanged
+		equals(2, arr.length);
+	}
+
+	function testDynJoin() {
+		var arr:Array<Int> = [1, 2, 3];
+		var str = ASCompat.dynJoin(arr, ",");
+		equals("1,2,3", str);
+	}
+
+	function testDynSlice() {
+		var arr:Array<Int> = [1, 2, 3, 4, 5];
+		var result:Array<Int> = ASCompat.dynSlice(arr, 1, 3);
+		equals(2, result.length);
+		equals(2, result[0]);
+		equals(3, result[1]);
+	}
 }
 
 private class TestASCompatSumCtx {
