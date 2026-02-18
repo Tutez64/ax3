@@ -7,6 +7,7 @@ class Main {
 			new TestASArrayBase(),
 			new TestASDictionary(),
 			new TestASProxyBase(),
+			new TestRegExp(),
 		]);
 	}
 }
