@@ -56,8 +56,10 @@ class ASCompat {
 		var setTimeoutExpr =
 			if (Context.defined("flash"))
 				macro untyped __global__["flash.utils.setTimeout"]
+			else if (Context.defined("js"))
+				macro js.Browser.window.setTimeout
 			else
-				macro js.Browser.window.setTimeout;
+				macro ASCompat._setTimeoutNative;
 		return macro @:pos(Context.currentPos()) $setTimeoutExpr($a{args});
 	}
 
@@ -66,9 +68,51 @@ class ASCompat {
 		var setIntervalExpr =
 			if (Context.defined("flash"))
 				macro untyped __global__["flash.utils.setInterval"]
+			else if (Context.defined("js"))
+				macro js.Browser.window.setInterval
 			else
-				macro js.Browser.window.setInterval;
+				macro ASCompat._setIntervalNative;
 		return macro @:pos(Context.currentPos()) $setIntervalExpr($a{args});
+	}
+
+	static function vectorSpliceAll<T>(a:Expr, startIndex:Expr):Expr {
+		var pos = Context.currentPos();
+		return macro @:pos(pos) {
+			var ___v = $a;
+			___v.splice($startIndex, ___v.length);
+		};
+	}
+
+	static function vectorSplice<T>(a:Expr, startIndex:Expr, deleteCount:Expr, values:Expr):Expr {
+		var pos = Context.currentPos();
+		if (values == null) {
+			return macro @:pos(pos) {
+				var ___v = $a;
+				___v.splice($startIndex, $deleteCount);
+			};
+		}
+		return macro @:pos(pos) {
+			var ___v = $a;
+			var ___removed = ___v.splice($startIndex, $deleteCount);
+			var ___values = $values;
+			if (___values != null) {
+				for (___i in 0...___values.length) {
+					#if flash
+					var ___len = ___v.length;
+					___v.length = ___len + 1;
+					var ___j = ___len;
+					while (___j > $startIndex + ___i) {
+						___v[___j] = ___v[___j - 1];
+						___j--;
+					}
+					___v[$startIndex + ___i] = ___values[___i];
+					#else
+					___v.insertAt($startIndex + ___i, ___values[___i]);
+					#end
+				}
+			}
+			___removed;
+		};
 	}
 
 	static function processNull(e:Expr):Expr {

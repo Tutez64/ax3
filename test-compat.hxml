@@ -20,6 +20,21 @@
 -cp compat-test
 -lib utest
 -lib openfl
+-lib lime
+-D nocffi
+-D disable-cffi
+-main Main
+-cpp test-cpp
+--remap flash:openfl
+
+-cmd .\test-cpp\Main.exe
+
+--next
+
+-cp compat
+-cp compat-test
+-lib utest
+-lib openfl
 -main Main
 -swf test.swf
 

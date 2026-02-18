@@ -50,40 +50,19 @@ abstract ASAny(Dynamic)
 	@:to inline function ___toFloat():Float return js.Syntax.code("Number")(this);
 	@:to inline function ___toInt():Int return Std.int(___toFloat());
 	#else
+	@:to public inline function ___toString():String return if (this == null) null else ASCompat.toString(this);
+
 	@:to function ___toBool():Bool {
-		if (this == null) {
-			return false;
-		}
-		if (Std.isOfType(this, Float)) {
-			var v:Float = cast this;
-			return v != 0 && !Math.isNaN(v);
-		}
-		return cast this;
+		return ASCompat.toBool(this);
 	}
 
 	@:to function ___toFloat():Float {
-		throw "TODO";
+		return ASCompat.toNumber(this);
 	}
 
 	@:to function ___toInt():Int {
-		if (this == null) {
-			return 0;
-		}
-		if (Std.isOfType(this, Int)) {
-			return cast this;
-		}
-		if (Std.isOfType(this, Float)) {
-			var v:Float = cast this;
-			return if (Math.isNaN(v)) 0 else Std.int(v);
-		}
-		if (Std.isOfType(this, String)) {
-			var i = Std.parseInt(cast this);
-			return if (i == null) 0 else i;
-		}
-		if (Std.isOfType(this, Bool)) {
-			return if (cast this) 1 else 0;
-		}
-		return 0;
+		var n = ASCompat.toNumber(this);
+		return if (Math.isNaN(n)) 0 else Std.int(n);
 	}
 	#end
 
@@ -113,10 +92,19 @@ abstract ASAny(Dynamic)
 		if (!handled) {
 			#if flash
 			result = Reflect.getProperty(obj, name);
-			#else
+			#elseif js
 			var value:Dynamic = Reflect.getProperty(obj, name);
 			if (Reflect.isFunction(value)) {
 				result = value.bind(obj); // TODO: maybe we should (ab)use Haxe/JS $bind here for caching the bound methods?
+			} else {
+				result = value;
+			}
+			#else
+			var value:Dynamic = Reflect.getProperty(obj, name);
+			if (Reflect.isFunction(value)) {
+				result = Reflect.makeVarArgs(function(args:Array<Dynamic>):Dynamic {
+					return Reflect.callMethod(obj, value, args);
+				});
 			} else {
 				result = value;
 			}
@@ -158,10 +146,24 @@ abstract ASAny(Dynamic)
 	}
 
 	// TODO: this (with Dynamic) will only really work on JS and Flash, but oh well
+	#if (flash || js)
 	@:op(a - b) static inline function ___subAny(a:ASAny, b:ASAny):ASAny return (a:Dynamic) - (b:Dynamic);
 	@:op(a + b) static inline function ___addAny(a:ASAny, b:ASAny):ASAny return (a:Dynamic) + (b:Dynamic);
 	@:op(a / b) static inline function ___divAny(a:ASAny, b:ASAny):ASAny return (a:Dynamic) / (b:Dynamic);
 	@:op(a * b) static inline function ___mulAny(a:ASAny, b:ASAny):ASAny return (a:Dynamic) * (b:Dynamic);
+	#else
+	@:op(a + b) static inline function ___addAny(a:ASAny, b:ASAny):ASAny {
+		var left:Dynamic = a;
+		var right:Dynamic = b;
+		if (Std.isOfType(left, String) || Std.isOfType(right, String)) {
+			return cast (ASCompat.toString(left) + ASCompat.toString(right));
+		}
+		return cast (ASCompat.toNumber(left) + ASCompat.toNumber(right));
+	}
+	@:op(a - b) static inline function ___subAny(a:ASAny, b:ASAny):ASAny return cast (ASCompat.toNumber(a) - ASCompat.toNumber(b));
+	@:op(a / b) static inline function ___divAny(a:ASAny, b:ASAny):ASAny return cast (ASCompat.toNumber(a) / ASCompat.toNumber(b));
+	@:op(a * b) static inline function ___mulAny(a:ASAny, b:ASAny):ASAny return cast (ASCompat.toNumber(a) * ASCompat.toNumber(b));
+	#end
 
 	@:op(a > b) static function ___gt(a:ASAny, b:Float):Bool return a.___toFloat() > b;
 	@:op(a < b) static function ___lt(a:ASAny, b:Float):Bool return a.___toFloat() < b;

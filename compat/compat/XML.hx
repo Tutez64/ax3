@@ -1,10 +1,15 @@
 package compat;
 
 import Xml as StdXml;
+import haxe.ds.ObjectMap;
 
 private typedef XMLImpl = #if flash flash.xml.XML #else StdXml #end;
 
 abstract XML(XMLImpl) from XMLImpl to XMLImpl {
+	#if !flash
+	static final attrOrder = new ObjectMap<StdXml, Array<String>>();
+	#end
+
 	public static inline function typeReference() {
 		#if flash
 		return flash.xml.XML;
@@ -50,6 +55,12 @@ abstract XML(XMLImpl) from XMLImpl to XMLImpl {
 		#if flash
 		this.attribute(name)[0] = new flash.xml.XML(value);
 		#else
+		var existing = getAttrOrder(this);
+		var hadAttribute = existing.indexOf(name) != -1;
+		if (!hadAttribute) {
+			existing.push(name);
+		}
+		attrOrder.set(this, existing);
 		this.set(name, value);
 		#end
 		return value;
@@ -114,6 +125,56 @@ abstract XML(XMLImpl) from XMLImpl to XMLImpl {
 	}
 
 	#if !flash
+	static function getAttrOrder(x:StdXml):Array<String> {
+		if (attrOrder.exists(x)) {
+			return attrOrder.get(x).copy();
+		}
+		return [for (a in x.attributes()) a];
+	}
+
+	static inline function escapeAttrValue(s:String):String {
+		return s.split("&").join("&amp;").split("\"").join("&quot;").split("<").join("&lt;");
+	}
+
+	static function serializeXml(x:StdXml):String {
+		if (x == null) return null;
+		return switch x.nodeType {
+			case Element:
+				var order = getAttrOrder(x);
+				var buf = new StringBuf();
+				buf.add("<");
+				buf.add(x.nodeName);
+				for (a in order) {
+					var v = x.get(a);
+					if (v != null) {
+						buf.add(" ");
+						buf.add(a);
+						buf.add("=\"");
+						buf.add(escapeAttrValue(v));
+						buf.add("\"");
+					}
+				}
+				var children = [for (child in x) child];
+				if (children.length == 0) {
+					buf.add("/>");
+				} else {
+					buf.add(">");
+					for (child in children) {
+						buf.add(switch child.nodeType {
+							case Element: serializeXml(child);
+							default: child.toString();
+						});
+					}
+					buf.add("</");
+					buf.add(x.nodeName);
+					buf.add(">");
+				}
+				buf.toString();
+			default:
+				x.toString();
+		}
+	}
+
 	static function fillDescendants(x:StdXml, name:String, acc:Array<XML>) {
 		for (child in x.elements()) {
 			if (name == "*" || child.nodeName == name) {
@@ -146,7 +207,7 @@ abstract XML(XMLImpl) from XMLImpl to XMLImpl {
 		#if flash
 		return this.toXMLString();
 		#else
-		return this.toString();
+		return serializeXml(this);
 		#end
 	}
 

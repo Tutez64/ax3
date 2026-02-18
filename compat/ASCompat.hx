@@ -3,8 +3,13 @@ import haxe.macro.Expr;
 #end
 
 import haxe.Constraints.Function;
+import haxe.ds.IntMap;
+import haxe.Timer;
+using StringTools;
 
 class ASCompat {
+	public static final UNDEFINED:Dynamic = {__as3_undefined__: true};
+
 	public static inline final MAX_INT = 2147483647;
 	public static inline final MIN_INT = -2147483648;
 
@@ -27,16 +32,20 @@ class ASCompat {
 	public static inline function escape(s:String):String {
 		#if flash
 		return untyped __global__["escape"](s);
-		#else
+		#elseif js
 		return js.Lib.global.escape(s);
+		#else
+		return StringTools.urlEncode(s);
 		#end
 	}
 
 	public static inline function unescape(s:String):String {
 		#if flash
 		return untyped __global__["unescape"](s);
-		#else
+		#elseif js
 		return js.Lib.global.unescape(s);
+		#else
+		return StringTools.urlDecode(s);
 		#end
 	}
 
@@ -65,15 +74,17 @@ class ASCompat {
 	public static inline function toNumber(d:Dynamic):Float {
 		#if flash
 		return untyped __global__["Number"](d);
-		#else
+		#elseif js
 		return js.Syntax.code("Number")(d);
+		#else
+		return toNumberNative(d);
 		#end
 	}
 
 	// Number(obj.fieldName) - handles undefined fields correctly
 	// When accessing a field on a Dynamic object, Haxe converts undefined to null
 	// but AS3 Number(undefined) = NaN while Number(null) = 0
-	public static inline function toNumberField(obj:Dynamic, fieldName:String):Float {
+	public static function toNumberField(obj:Dynamic, fieldName:String):Float {
 		#if flash
 		// 1. Use Reflect.getProperty to ensure Haxe getters are called correctly.
 		// Standard untyped access obj[fieldName] might return the raw backing field (0) instead of the getter value.
@@ -84,9 +95,16 @@ class ASCompat {
 		// return (missing) ? NaN : Number(v)
 		return if (obj == null || (v == null && !untyped __in__(fieldName, obj))) Math.NaN else untyped __global__["Number"](v);
 		#else
-		// For JS, use Reflect to check field existence and get value
+		if (fieldName == "length") {
+			if (Std.isOfType(obj, Array)) return (cast obj : Array<Dynamic>).length;
+			var getLen = Reflect.field(obj, "get_length");
+			if (getLen != null && Reflect.isFunction(getLen)) {
+				return toNumber(Reflect.callMethod(obj, getLen, []));
+			}
+		}
+		// For non-Flash targets, use Reflect to check field existence and get value.
 		if (obj == null || !Reflect.hasField(obj, fieldName)) return Math.NaN;
-		return js.Syntax.code("Number")(Reflect.field(obj, fieldName));
+		return toNumber(Reflect.field(obj, fieldName));
 		#end
 	}
 
@@ -94,8 +112,10 @@ class ASCompat {
 	public static inline function toBool(d:Dynamic):Bool {
 		#if flash
 		return untyped __global__["Boolean"](d);
-		#else
+		#elseif js
 		return js.Syntax.code("Boolean")(d);
+		#else
+		return toBoolNative(d);
 		#end
 	}
 
@@ -103,8 +123,11 @@ class ASCompat {
 	public static inline function toString(d:Dynamic):String {
 		#if flash
 		return Std.string(d);
-		#else
+		#elseif js
 		return js.Syntax.code("String")(d);
+		#else
+		if (Std.isOfType(d, Float) && Math.isNaN(cast d)) return "NaN";
+		return Std.string(d);
 		#end
 	}
 
@@ -134,7 +157,7 @@ class ASCompat {
 		#elseif js
 		return if (js.Syntax.typeof(v) == "boolean") cast v else null;
 		#else
-		return if (v == true || v == false) cast v else null;
+		return if (Std.isOfType(v, Bool)) cast v else null;
 		#end
 	}
 
@@ -146,11 +169,15 @@ class ASCompat {
 		#end
 	}
 
-	public static inline function asXMLList(v:Any):Null<compat.XMLList> {
+	public static function asXMLList(v:Any):Null<compat.XMLList> {
 		#if flash
 		return if (Std.isOfType(v, flash.xml.XMLList)) cast v else null;
 		#else
-		return if (Std.isOfType(v, Array)) cast v else null;
+		if (Std.isOfType(v, Array)) {
+			var list:compat.XMLList = cast (v : Dynamic);
+			return list;
+		}
+		return null;
 		#end
 	}
 
@@ -185,19 +212,49 @@ class ASCompat {
 	}
 
 	public static inline function toExponential(n:Float, ?digits:Int):String {
+		#if (js || flash)
 		return (cast n).toExponential(digits);
+		#else
+		return Std.string(n);
+		#end
 	}
 
 	public static inline function toFixed(n:Float, ?digits:Int):String {
+		#if (js || flash)
 		return (cast n).toFixed(digits);
+		#else
+		if (digits == null) return Std.string(n);
+		return toFixedNative(n, digits);
+		#end
 	}
 
 	public static inline function toPrecision(n:Float, precision:Int):String {
+		#if (js || flash)
 		return (cast n).toPrecision(precision);
+		#else
+		if (precision <= 0) return Std.string(n);
+		return Std.string(n);
+		#end
 	}
 
 	public static inline function toRadix(n:Float, radix:Int = 10):String {
+		#if (js || flash)
 		return (cast n).toString(radix);
+		#else
+		if (radix == 10) return Std.string(n);
+		var iv = Std.int(n);
+		if (iv == 0) return "0";
+		var neg = iv < 0;
+		var value = if (neg) -iv else iv;
+		var baseChars = "0123456789abcdefghijklmnopqrstuvwxyz";
+		var out = "";
+		while (value > 0) {
+			var d = value % radix;
+			out = baseChars.charAt(d) + out;
+			value = Std.int(value / radix);
+		}
+		return if (neg) "-" + out else out;
+		#end
 	}
 
 	public static inline function xmlToList(xml:compat.XML):compat.XMLList {
@@ -274,30 +331,9 @@ class ASCompat {
 		return result;
 	}
 
-	public static inline function vectorSpliceAll<T>(a:flash.Vector<T>, startIndex:Int):flash.Vector<T> {
-		return a.splice(startIndex, a.length);
-	}
+	public static macro function vectorSpliceAll<T>(a:ExprOf<flash.Vector<T>>, startIndex:ExprOf<Int>):ExprOf<flash.Vector<T>>;
 
-	public static function vectorSplice<T>(a:flash.Vector<T>, startIndex:Int, deleteCount:Int, ?values:Array<T>):flash.Vector<T> {
-		var result = a.splice(startIndex, deleteCount);
-		if (values != null) {
-			for (i in 0...values.length) {
-				vectorInsertAt(a, startIndex + i, values[i]);
-			}
-		}
-		return result;
-	}
-
-	static function vectorInsertAt<T>(a:flash.Vector<T>, index:Int, value:T):Void {
-		var len = a.length;
-		a.length = len + 1;
-		var i = len;
-		while (i > index) {
-			a[i] = a[i - 1];
-			i--;
-		}
-		a[index] = value;
-	}
+	public static macro function vectorSplice<T>(a:ExprOf<flash.Vector<T>>, startIndex:ExprOf<Int>, deleteCount:ExprOf<Int>, ?values:ExprOf<Array<T>>):ExprOf<flash.Vector<T>>;
 
 	public static macro function vectorClass<T>(typecheck:Expr):ExprOf<Class<flash.Vector<T>>>;
 	public static macro function asVector<T>(value:Expr, typecheck:Expr):ExprOf<Null<flash.Vector<T>>>;
@@ -305,7 +341,13 @@ class ASCompat {
 
 	@:noCompletion public static inline function _asVector<T>(value:Any):Null<flash.Vector<T>> return if (_isVector(value)) value else null;
 	@:noCompletion public static inline function _isVector(value:Any):Bool
-	return Reflect.hasField(value, '__array') && Reflect.hasField(value, 'fixed');
+	return (Reflect.hasField(value, '__array') && Reflect.hasField(value, 'fixed'))
+		|| (Reflect.hasField(value, 'get_length') && Reflect.hasField(value, 'get') && Reflect.hasField(value, 'set'))
+		|| {
+			var cls = Type.getClass(value);
+			var className = if (cls == null) null else Type.getClassName(cls);
+			className != null && className.startsWith("openfl._Vector.");
+		};
 
 	public static inline function asFunction(v:Any):Null<ASFunction> {
 		return if (Reflect.isFunction(v)) v else null;
@@ -316,8 +358,10 @@ class ASCompat {
 	public static inline function clearTimeout(id:UInt):Void {
 		#if flash
 		untyped __global__["flash.utils.clearTimeout"](id);
-		#else
+		#elseif js
 		js.Browser.window.clearTimeout(id);
+		#else
+		_clearTimeoutNative(id);
 		#end
 	}
 
@@ -326,8 +370,10 @@ class ASCompat {
 	public static inline function clearInterval(id:UInt):Void {
 		#if flash
 		untyped __global__["flash.utils.clearInterval"](id);
-		#else
+		#elseif js
 		js.Browser.window.clearInterval(id);
+		#else
+		_clearIntervalNative(id);
 		#end
 	}
 
@@ -362,7 +408,7 @@ class ASCompat {
 		#if flash
 		return v;
 		#else
-		return js.Syntax.code("Number")(v);
+		return toNumber(v);
 		#end
 	}
 
@@ -409,11 +455,14 @@ class ASCompat {
 			base = 10;
 		}
 		var acc = 0;
-		try s.split('').map(function(c) {
+		var chars = s.split("");
+		for (c in chars) {
 			var i = BASE.indexOf(c);
-			if(i < 0 || i >= base) throw 'invalid';
+			if (i < 0 || i >= base) {
+				break;
+			}
 			acc = (acc * base) + i;
-		}) catch(e:Dynamic) {};
+		}
 		return acc * sign;
 		#end
 	}
@@ -763,6 +812,125 @@ class ASCompat {
 		return null;
 	}
 
+	static inline function toNumberNative(d:Dynamic):Float {
+		if (d == null) {
+			return 0;
+		}
+		if (Std.isOfType(d, Float)) {
+			return cast d;
+		}
+		if (Std.isOfType(d, Int)) {
+			return cast d;
+		}
+		if (Std.isOfType(d, Bool)) {
+			return (cast d : Bool) ? 1 : 0;
+		}
+		if (Std.isOfType(d, String)) {
+			var s = StringTools.trim(cast d);
+			if (s == "NaN") return Math.NaN;
+			if (s == "") {
+				return 0;
+			}
+			var f = Std.parseFloat(s);
+			return if (Math.isNaN(f)) Math.NaN else f;
+		}
+		if (Std.isOfType(d, Array)) {
+			var a:Array<Dynamic> = cast d;
+			return switch a.length {
+				case 0: 0;
+				case 1: toNumberNative(a[0]);
+				default: Math.NaN;
+			}
+		}
+		return Math.NaN;
+	}
+
+	static function toFixedNative(n:Float, digits:Int):String {
+		if (digits < 0) {
+			digits = 0;
+		}
+		var factor = Math.pow(10, digits);
+		var rounded = Math.round(n * factor) / factor;
+		var s = Std.string(rounded);
+		var dotIndex = s.indexOf(".");
+		if (digits == 0) {
+			return if (dotIndex == -1) s else s.substring(0, dotIndex);
+		}
+		if (dotIndex == -1) {
+			s += ".";
+			dotIndex = s.length - 1;
+		}
+		var decimals = s.length - dotIndex - 1;
+		while (decimals < digits) {
+			s += "0";
+			decimals++;
+		}
+		return s;
+	}
+
+	static inline function toBoolNative(d:Dynamic):Bool {
+		if (d == null) {
+			return false;
+		}
+		if (Std.isOfType(d, Bool)) {
+			return cast d;
+		}
+		if (Std.isOfType(d, Int)) {
+			return (cast d : Int) != 0;
+		}
+		if (Std.isOfType(d, Float)) {
+			var f:Float = cast d;
+			return f != 0 && !Math.isNaN(f);
+		}
+		if (Std.isOfType(d, String)) {
+			return (cast d : String).length > 0;
+		}
+		return true;
+	}
+
+	#if !(flash || js)
+	static var _timeoutId:UInt = 1;
+	static var _intervalId:UInt = 1;
+	static var _timeouts:IntMap<Timer> = new IntMap();
+	static var _intervals:IntMap<Timer> = new IntMap();
+
+	@:noCompletion public static function _setTimeoutNative(closure:Function, delay:Float, args:Array<Dynamic>):UInt {
+		var id = _timeoutId++;
+		var timer = Timer.delay(function() {
+			_timeouts.remove(id);
+			Reflect.callMethod(null, closure, args);
+		}, Std.int(delay));
+		_timeouts.set(id, timer);
+		return id;
+	}
+
+	@:noCompletion public static function _clearTimeoutNative(id:UInt):Void {
+		var timer = _timeouts.get(id);
+		if (timer != null) {
+			timer.stop();
+			_timeouts.remove(id);
+		}
+	}
+
+	@:noCompletion public static function _setIntervalNative(closure:Function, delay:Float, args:Array<Dynamic>):UInt {
+		var id = _intervalId++;
+		var timer = new Timer(Std.int(delay));
+		timer.run = function() {
+			Reflect.callMethod(null, closure, args);
+		};
+		_intervals.set(id, timer);
+		return id;
+	}
+
+	@:noCompletion public static function _clearIntervalNative(id:UInt):Void {
+		var timer = _intervals.get(id);
+		if (timer != null) {
+			timer.stop();
+			_intervals.remove(id);
+		}
+	}
+	#end
+
 }
 
 class ASArray {
@@ -848,6 +1016,14 @@ class ASArray {
 
 
 class ASVector {
+	static inline function coerceSortResult(value:Dynamic):Int {
+		if (Std.isOfType(value, Int)) return value;
+		if (Std.isOfType(value, Float)) return Std.int(value);
+		if (Std.isOfType(value, Bool)) return value ? 1 : 0;
+		return Std.int(ASCompat.toNumber(value));
+	}
+
+	#if (flash || js)
 	public static inline function reverse<T>(a:flash.Vector<T>):flash.Vector<T> {
 		#if flash
 		return (cast a).reverse();
@@ -891,13 +1067,6 @@ class ASVector {
 		return a;
 	}
 
-	static inline function coerceSortResult(value:Dynamic):Int {
-		if (Std.isOfType(value, Int)) return value;
-		if (Std.isOfType(value, Float)) return Std.int(value);
-		if (Std.isOfType(value, Bool)) return value ? 1 : 0;
-		return Std.int(ASCompat.toNumber(value));
-	}
-
 	public static inline function sortWithOptions<T>(a:flash.Vector<T>, options:Int):flash.Vector<T> {
 		#if flash
 		return (cast a).sort(options);
@@ -913,6 +1082,84 @@ class ASVector {
 		return a;
 		#end
 	}
+	#else
+	static inline function getLen(v:Dynamic):Int {
+		var getLengthMethod = Reflect.field(v, "get_length");
+		if (getLengthMethod != null && Reflect.isFunction(getLengthMethod)) {
+			return Std.int(Reflect.callMethod(v, getLengthMethod, []));
+		}
+		return Std.int(Reflect.field(v, "length"));
+	}
+
+	static inline function getAt(v:Dynamic, index:Int):Dynamic {
+		var getMethod = Reflect.field(v, "get");
+		return if (getMethod != null) Reflect.callMethod(v, getMethod, [index]) else v[index];
+	}
+
+	static inline function setAt(v:Dynamic, index:Int, value:Dynamic):Void {
+		var setMethod = Reflect.field(v, "set");
+		if (setMethod != null) Reflect.callMethod(v, setMethod, [index, value]); else v[index] = value;
+	}
+
+	public static function reverse(a:Dynamic):Dynamic {
+		var len = getLen(a);
+		var i = 0;
+		var j = len - 1;
+		while (i < j) {
+			var left = getAt(a, i);
+			var right = getAt(a, j);
+			setAt(a, i, right);
+			setAt(a, j, left);
+			i++;
+			j--;
+		}
+		return a;
+	}
+
+	public static function forEach(a:Dynamic, callback:Dynamic, ?thisObj:Dynamic):Void {
+		for (i in 0...getLen(a)) {
+			var item = getAt(a, i);
+			if (thisObj != null) Reflect.callMethod(thisObj, callback, [item, i, a])
+			else Reflect.callMethod(null, callback, [item, i, a]);
+		}
+	}
+
+	public static function map(a:Dynamic, callback:Dynamic, ?thisObj:Dynamic):Dynamic {
+		var out:Array<Dynamic> = [];
+		for (i in 0...getLen(a)) {
+			var item = getAt(a, i);
+			var value:Dynamic =
+				if (thisObj != null) Reflect.callMethod(thisObj, callback, [item, i, a])
+				else Reflect.callMethod(null, callback, [item, i, a]);
+			out.push(value);
+		}
+		return out;
+	}
+
+	public static function sort(a:Dynamic, f:Dynamic):Dynamic {
+		if (f == null) {
+			a.sort(Reflect.compare);
+			return a;
+		}
+		a.sort(function(x, y) {
+			var result:Dynamic = Reflect.callMethod(null, f, [x, y]);
+			return coerceSortResult(result);
+		});
+		return a;
+	}
+
+	public static function sortWithOptions(a:Dynamic, options:Int):Dynamic {
+		if ((options & ASArray.RETURNINDEXEDARRAY) != 0) {
+			return a;
+		}
+		var items = [for (i in 0...getLen(a)) getAt(a, i)];
+		ASSortTools.sortWithOptions(items, options, function(v) return v);
+		for (i in 0...items.length) {
+			setAt(a, i, items[i]);
+		}
+		return a;
+	}
+	#end
 }
 
 class ASVectorTools {
@@ -1206,6 +1453,9 @@ class ASDate {
 	public static inline function setTime(d:Date, millisecond:Float):Float {
 		#if (js || flash || python)
 		return (cast d).setTime(millisecond);
+		#elseif cpp
+		untyped d.mSeconds = millisecond * 0.001;
+		return millisecond;
 		#else
 		return millisecond;
 		#end

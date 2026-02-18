@@ -56,39 +56,16 @@ abstract ASObject(flash.utils.Object)
 	@:to inline function ___toInt():Int return Std.int(___toFloat());
 	#else
 	@:to function ___toBool():Bool {
-		if (this == null) {
-			return false;
-		}
-		if (Std.isOfType(this, Float)) {
-			var v:Float = cast this;
-			return v != 0 && !Math.isNaN(v);
-		}
-		return cast this;
+		return ASCompat.toBool(this);
 	}
 
 	@:to function ___toFloat():Float {
-		throw "TODO";
+		return ASCompat.toNumber(this);
 	}
 
 	@:to function ___toInt():Int {
-		if (this == null) {
-			return 0;
-		}
-		if (Std.isOfType(this, Int)) {
-			return cast this;
-		}
-		if (Std.isOfType(this, Float)) {
-			var v:Float = cast this;
-			return if (Math.isNaN(v)) 0 else Std.int(v);
-		}
-		if (Std.isOfType(this, String)) {
-			var i = Std.parseInt(cast this);
-			return if (i == null) 0 else i;
-		}
-		if (Std.isOfType(this, Bool)) {
-			return if (cast this) 1 else 0;
-		}
-		return 0;
+		var n = ASCompat.toNumber(this);
+		return if (Math.isNaN(n)) 0 else Std.int(n);
 	}
 	#end
 

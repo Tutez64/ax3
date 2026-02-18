@@ -282,51 +282,85 @@ class TestASCompat extends utest.Test {
 		floatEquals(1234567, dTime.getTime());
 
 		var dFull = Date.fromTime(0);
-		var dFullExpected = Date.fromTime(0);
 		ASCompat.ASDate.setFullYear(dFull, 2020, 1, 2);
+		#if (js || flash || python)
+		var dFullExpected = Date.fromTime(0);
 		untyped dFullExpected.setFullYear(2020, 1, 2);
 		floatEquals(dFullExpected.getTime(), dFull.getTime());
+		#else
+		floatEquals(DateTools.makeUtc(2020, 1, 2, 0, 0, 0), dFull.getTime());
+		#end
 
 		var dMonth = Date.fromTime(0);
-		var dMonthExpected = Date.fromTime(0);
 		ASCompat.ASDate.setMonth(dMonth, 5, 6);
+		#if (js || flash || python)
+		var dMonthExpected = Date.fromTime(0);
 		untyped dMonthExpected.setMonth(5, 6);
 		floatEquals(dMonthExpected.getTime(), dMonth.getTime());
+		#else
+		floatEquals(DateTools.makeUtc(1970, 5, 6, 0, 0, 0), dMonth.getTime());
+		#end
 
 		var dDate = Date.fromTime(0);
-		var dDateExpected = Date.fromTime(0);
 		ASCompat.ASDate.setDate(dDate, 7);
+		#if (js || flash || python)
+		var dDateExpected = Date.fromTime(0);
 		untyped dDateExpected.setDate(7);
 		floatEquals(dDateExpected.getTime(), dDate.getTime());
+		#else
+		floatEquals(DateTools.makeUtc(1970, 0, 7, 0, 0, 0), dDate.getTime());
+		#end
 
 		var dHours = Date.fromTime(0);
-		var dHoursExpected = Date.fromTime(0);
 		ASCompat.ASDate.setHours(dHours, 8, 9, 10, 11);
+		#if (js || flash || python)
+		var dHoursExpected = Date.fromTime(0);
 		untyped dHoursExpected.setHours(8, 9, 10, 11);
 		floatEquals(dHoursExpected.getTime(), dHours.getTime());
+		#else
+		floatEquals(DateTools.makeUtc(1970, 0, 1, 8, 9, 10) + 11, dHours.getTime());
+		#end
 
 		var dMinutes = Date.fromTime(0);
-		var dMinutesExpected = Date.fromTime(0);
 		ASCompat.ASDate.setMinutes(dMinutes, 12, 13, 14);
+		#if (js || flash || python)
+		var dMinutesExpected = Date.fromTime(0);
 		untyped dMinutesExpected.setMinutes(12, 13, 14);
 		floatEquals(dMinutesExpected.getTime(), dMinutes.getTime());
+		#else
+		floatEquals(DateTools.makeUtc(1970, 0, 1, 0, 12, 13) + 14, dMinutes.getTime());
+		#end
 
 		var dSeconds = Date.fromTime(0);
-		var dSecondsExpected = Date.fromTime(0);
 		ASCompat.ASDate.setSeconds(dSeconds, 15, 16);
+		#if (js || flash || python)
+		var dSecondsExpected = Date.fromTime(0);
 		untyped dSecondsExpected.setSeconds(15, 16);
 		floatEquals(dSecondsExpected.getTime(), dSeconds.getTime());
+		#else
+		floatEquals(DateTools.makeUtc(1970, 0, 1, 0, 0, 15) + 16, dSeconds.getTime());
+		#end
 
 		var dMs = Date.fromTime(0);
-		var dMsExpected = Date.fromTime(0);
 		ASCompat.ASDate.setMilliseconds(dMs, 123);
+		#if (js || flash || python)
+		var dMsExpected = Date.fromTime(0);
 		untyped dMsExpected.setMilliseconds(123);
 		floatEquals(dMsExpected.getTime(), dMs.getTime());
 		floatEquals(untyped dMsExpected.getMilliseconds(), ASCompat.ASDate.getMilliseconds(dMs));
+		#else
+		floatEquals(123, dMs.getTime());
+		floatEquals(123, ASCompat.ASDate.getMilliseconds(dMs));
+		#end
 
 		var dUtcMs = Date.fromTime(0);
+		#if (js || flash || python)
 		untyped dUtcMs.setUTCMilliseconds(321);
 		floatEquals(untyped dUtcMs.getUTCMilliseconds(), ASCompat.ASDate.getUTCMilliseconds(dUtcMs));
+		#else
+		ASCompat.ASDate.setUTCMilliseconds(dUtcMs, 321);
+		floatEquals(321, ASCompat.ASDate.getUTCMilliseconds(dUtcMs));
+		#end
 
 		var utcValue = ASCompat.ASDate.UTC(2020, 0, 2, 3, 4, 5, 6);
 		#if (js || flash || python)
