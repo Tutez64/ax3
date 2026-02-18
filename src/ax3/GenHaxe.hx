@@ -284,9 +284,13 @@ class GenHaxe extends PrinterBase {
 		printTextWithTrivia(normalizeTypeName(c.name), c.syntax.name);
 		if (info.extend != null) {
 			printTextWithTrivia("extends", info.extend.syntax.keyword);
-			if (ParseTree.dotPathToString(info.extend.syntax.path) == "Array") {
+			if (isArrayBaseClass(info.extend)) {
 				printTrivia(ParseTree.getDotPathLeadingTrivia(info.extend.syntax.path));
 				buf.add("ASArrayBase");
+				printTrivia(ParseTree.getDotPathTrailingTrivia(info.extend.syntax.path));
+			} else if (isByteArrayBaseClass(info.extend)) {
+				printTrivia(ParseTree.getDotPathLeadingTrivia(info.extend.syntax.path));
+				buf.add("ASByteArrayBase");
 				printTrivia(ParseTree.getDotPathTrailingTrivia(info.extend.syntax.path));
 			} else {
 				printDotPathNormalized(info.extend.syntax.path, LastType);
@@ -362,6 +366,33 @@ class GenHaxe extends PrinterBase {
 		flushStaticInitGroup();
 
 		printCloseBrace(c.syntax.closeBrace);
+	}
+
+	static function isArrayBaseClass(extend:TClassExtend):Bool {
+		var superClass = extend.superClass;
+		if (superClass != null) {
+			if (superClass.name == "Array") return true;
+		}
+		return ParseTree.dotPathToString(extend.syntax.path) == "Array";
+	}
+
+	static function isByteArrayBaseClass(extend:TClassExtend):Bool {
+		var superClass = extend.superClass;
+		if (superClass != null && superClass.name == "ByteArray") {
+			var packName = superClass.parentModule.parentPack.name;
+			if (packName == "" || packName == "flash.utils" || packName == "openfl.utils") {
+				return true;
+			}
+		}
+		var path = ParseTree.dotPathToString(extend.syntax.path);
+		if (path == "ByteArray" || path == "flash.utils.ByteArray" || path == "openfl.utils.ByteArray") {
+			return true;
+		}
+		var last = if (extend.syntax.path.rest.length == 0)
+			extend.syntax.path.first.text
+		else
+			extend.syntax.path.rest[extend.syntax.path.rest.length - 1].element.text;
+		return last == "ByteArray";
 	}
 
 	function printStaticInitGroup(group:Array<{expr:TExpr}>, name:String, memberIndent:String, innerIndent:String) {
