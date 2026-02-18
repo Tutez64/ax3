@@ -49,11 +49,154 @@ class ASCompat {
 		#end
 	}
 
-	#if flash
 	public static inline function describeType(value:Any):compat.XML {
+		#if flash
 		return flash.Lib.describeType(value);
+		#else
+		return describeTypeNonFlash(value);
+		#end
 	}
 
+	#if !flash
+	static function describeTypeNonFlash(value:Dynamic):compat.XML {
+		var isClassObject = Std.isOfType(value, Class);
+		var cls:Class<Dynamic> = isClassObject ? cast value : Type.getClass(value);
+		var root = Xml.createElement("type");
+		root.set("name", describeTypeName(value, cls, isClassObject));
+		root.set("isDynamic", isDynamicType(value, cls, isClassObject) ? "true" : "false");
+		root.set("isStatic", isClassObject ? "true" : "false");
+		root.set("isFinal", "false");
+
+		if (cls != null) {
+			appendInheritance(root, cls);
+			if (isClassObject) {
+				appendMembers(root, cls, cls, true);
+				var factory = Xml.createElement("factory");
+				factory.set("type", Type.getClassName(cls));
+				root.addChild(factory);
+				appendMembers(factory, null, cls, false);
+			} else {
+				appendMembers(root, value, cls, false);
+			}
+		} else if (value != null) {
+			appendDynamicMembers(root, value);
+		}
+
+		return cast root;
+	}
+
+	static function describeTypeName(value:Dynamic, cls:Class<Dynamic>, isClassObject:Bool):String {
+		if (value == null) return "null";
+		if (isClassObject) return Type.getClassName(cast value);
+		if (cls != null) return Type.getClassName(cls);
+		return "Object";
+	}
+
+	static function isDynamicType(value:Dynamic, cls:Class<Dynamic>, isClassObject:Bool):Bool {
+		if (value == null || isClassObject) return false;
+		if (cls == null) return true;
+		return Reflect.fields(value).length > 0;
+	}
+
+	static function appendInheritance(root:Xml, cls:Class<Dynamic>):Void {
+		var current = Type.getSuperClass(cls);
+		while (current != null) {
+			var node = Xml.createElement("extendsClass");
+			node.set("type", Type.getClassName(current));
+			root.addChild(node);
+			current = Type.getSuperClass(current);
+		}
+	}
+
+	static function appendDynamicMembers(root:Xml, value:Dynamic):Void {
+		for (field in Reflect.fields(value)) {
+			var fieldValue = Reflect.field(value, field);
+			if (Reflect.isFunction(fieldValue)) {
+				root.addChild(createMethodNode(field, "Object"));
+			} else {
+				root.addChild(createVariableNode(field, "Object"));
+			}
+		}
+	}
+
+	static function appendMembers(root:Xml, value:Dynamic, cls:Class<Dynamic>, isStatic:Bool):Void {
+		var declaredBy = Type.getClassName(cls);
+		var fieldNames = isStatic ? Type.getClassFields(cls) : Type.getInstanceFields(cls);
+		var accessorNames = new Map<String, {hasGetter:Bool, hasSetter:Bool}>();
+		var ignored = new Map<String, Bool>();
+
+		for (name in fieldNames) {
+			if (name == "__name__" || name == "__constructs__" || name == "new") {
+				ignored.set(name, true);
+				continue;
+			}
+			if (StringTools.startsWith(name, "get_")) {
+				var prop = name.substr(4);
+				var state = accessorNames.exists(prop) ? accessorNames.get(prop) : {hasGetter: false, hasSetter: false};
+				state.hasGetter = true;
+				accessorNames.set(prop, state);
+				ignored.set(name, true);
+				continue;
+			}
+			if (StringTools.startsWith(name, "set_")) {
+				var prop = name.substr(4);
+				var state = accessorNames.exists(prop) ? accessorNames.get(prop) : {hasGetter: false, hasSetter: false};
+				state.hasSetter = true;
+				accessorNames.set(prop, state);
+				ignored.set(name, true);
+				continue;
+			}
+		}
+
+		for (name => state in accessorNames) {
+			root.addChild(createAccessorNode(name, state, declaredBy));
+		}
+
+		for (name in fieldNames) {
+			if (ignored.exists(name)) {
+				continue;
+			}
+
+			var shouldBeVariable = false;
+			if (value != null && Reflect.hasField(value, name)) {
+				shouldBeVariable = !Reflect.isFunction(Reflect.field(value, name));
+			}
+
+			if (shouldBeVariable) {
+				root.addChild(createVariableNode(name, declaredBy));
+			} else {
+				root.addChild(createMethodNode(name, declaredBy));
+			}
+		}
+	}
+
+	static function createAccessorNode(name:String, state:{hasGetter:Bool, hasSetter:Bool}, declaredBy:String):Xml {
+		var node = Xml.createElement("accessor");
+		node.set("name", name);
+		node.set("access", state.hasGetter && state.hasSetter ? "readwrite" : state.hasGetter ? "readonly" : "writeonly");
+		node.set("type", "*");
+		node.set("declaredBy", declaredBy);
+		return node;
+	}
+
+	static function createVariableNode(name:String, declaredBy:String):Xml {
+		var node = Xml.createElement("variable");
+		node.set("name", name);
+		node.set("type", "*");
+		node.set("declaredBy", declaredBy);
+		return node;
+	}
+
+	static function createMethodNode(name:String, declaredBy:String):Xml {
+		var node = Xml.createElement("method");
+		node.set("name", name);
+		node.set("returnType", "*");
+		node.set("declaredBy", declaredBy);
+		return node;
+	}
+	#end
+
+	#if flash
 	// classObject is Any and not Class<Dynamic>, because in Flash we also want to pass Bool to it
 	// this is also the reason this function is not automatically added to Globals.hx
 	public static inline function registerClassAlias(aliasName:String, classObject:Any) {

@@ -213,6 +213,36 @@ class TestASCompat extends utest.Test {
 		equals("object", ASCompat.typeof(null));
 	}
 
+	function testDescribeTypeBasicContract() {
+		var info = ASCompat.describeType(new TestASCompatDescribeTarget());
+		equals("type", info.name());
+		equals("false", info.attribute("isStatic"));
+		isTrue(info.attribute("name").length > 0);
+
+		var classInfo = ASCompat.describeType(TestASCompatDescribeTarget);
+		equals("type", classInfo.name());
+		equals("true", classInfo.attribute("isStatic"));
+		isTrue(classInfo.child("factory").length() == 1);
+	}
+
+	#if !flash
+	function testDescribeTypeNonFlashMembers() {
+		var dynamicObj:ASObject = {
+			count: 3,
+			run: function() return 1
+		};
+		var dynamicInfo = ASCompat.describeType(dynamicObj);
+		equals("true", dynamicInfo.attribute("isDynamic"));
+		isTrue(xmlListHasNodeWithName(dynamicInfo.child("variable"), "count"));
+		isTrue(xmlListHasNodeWithName(dynamicInfo.child("method"), "run"));
+
+		var info = ASCompat.describeType(new TestASCompatDescribeTarget());
+		isTrue(xmlListHasNodeWithName(info.child("accessor"), "readOnly"));
+		isTrue(xmlListHasNodeWithName(info.child("accessor"), "readWrite"));
+		isTrue(info.child("extendsClass").length() >= 1);
+	}
+	#end
+
 	function testAsOperator() {
 		equals("test", ASCompat.asString("test"));
 		equals(null, ASCompat.asString(123));
@@ -472,6 +502,15 @@ class TestASCompat extends utest.Test {
 		equals(2, result[0]);
 		equals(3, result[1]);
 	}
+
+	static function xmlListHasNodeWithName(nodes:compat.XMLList, expectedName:String):Bool {
+		for (node in nodes) {
+			if (node.attribute("name") == expectedName) {
+				return true;
+			}
+		}
+		return false;
+	}
 }
 
 private class TestASCompatSumCtx {
@@ -482,5 +521,50 @@ private class TestASCompatSumCtx {
 	public function test(value:Int, index:Int, array:Array<Int>):Bool {
 		sum += value;
 		return value == 2;
+	}
+}
+
+private class TestASCompatDescribeBase {
+	public var baseValue:Int = 10;
+
+	public function new() {}
+
+	public function baseMethod():Int {
+		return baseValue;
+	}
+}
+
+private class TestASCompatDescribeTarget extends TestASCompatDescribeBase {
+	public static var staticValue:Int = 42;
+
+	public var value:Int = 7;
+	public var readOnly(get, never):Int;
+	public var readWrite(get, set):Int;
+
+	var _readWrite:Int = 0;
+
+	public function new() {
+		super();
+	}
+
+	function get_readOnly():Int {
+		return value;
+	}
+
+	function get_readWrite():Int {
+		return _readWrite;
+	}
+
+	function set_readWrite(v:Int):Int {
+		_readWrite = v;
+		return v;
+	}
+
+	public static function staticMethod():Int {
+		return staticValue;
+	}
+
+	public function instanceMethod():Int {
+		return value;
 	}
 }
