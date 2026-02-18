@@ -108,6 +108,51 @@ class ASCompat {
 		#end
 	}
 
+	public static function getProperty(obj:Dynamic, fieldName:Dynamic):Dynamic {
+		if (obj == null) {
+			return null;
+		}
+		#if !flash
+		var proxyGetter = Reflect.field(obj, "getProperty");
+		if (proxyGetter != null && Reflect.isFunction(proxyGetter)) {
+			return Reflect.callMethod(obj, proxyGetter, [fieldName]);
+		}
+		#end
+		return Reflect.getProperty(obj, propertyName(fieldName));
+	}
+
+	public static function setProperty(obj:Dynamic, fieldName:Dynamic, value:Dynamic):Dynamic {
+		if (obj == null) {
+			return value;
+		}
+		#if !flash
+		var proxySetter = Reflect.field(obj, "setProperty");
+		if (proxySetter != null && Reflect.isFunction(proxySetter)) {
+			Reflect.callMethod(obj, proxySetter, [fieldName, value]);
+			return value;
+		}
+		#end
+		Reflect.setProperty(obj, propertyName(fieldName), value);
+		return value;
+	}
+
+	public static function deleteProperty(obj:Dynamic, fieldName:Dynamic):Bool {
+		if (obj == null) {
+			return true;
+		}
+		#if !flash
+		var proxyDelete = Reflect.field(obj, "deleteProperty");
+		if (proxyDelete != null && Reflect.isFunction(proxyDelete)) {
+			return toBool(Reflect.callMethod(obj, proxyDelete, [fieldName]));
+		}
+		#end
+		return Reflect.deleteField(obj, propertyName(fieldName));
+	}
+
+	static inline function propertyName(fieldName:Dynamic):String {
+		return Std.string(fieldName);
+	}
+
 	// Boolean(d)
 	public static inline function toBool(d:Dynamic):Bool {
 		#if flash

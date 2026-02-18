@@ -6,6 +6,7 @@ class Main {
 			new TestASCompat(),
 			new TestASArrayBase(),
 			new TestASDictionary(),
+			new TestASProxyBase(),
 		]);
 	}
 }

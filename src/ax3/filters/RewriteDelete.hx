@@ -1,7 +1,7 @@
 package ax3.filters;
 
 class RewriteDelete extends AbstractFilter {
-	static final tDeleteField = TTFun([TTAny, TTString], TTBoolean);
+	static final tDeleteProperty = TTFun([TTAny, TTString], TTBoolean);
 
 	override function processExpr(e:TExpr):TExpr {
 		e = mapExpr(processExpr, e);
@@ -26,7 +26,7 @@ class RewriteDelete extends AbstractFilter {
 	function rewriteFieldDelete(deleteKeyword:Token, obj:TFieldObject, fieldName:String, fieldToken:Token, eDelete:TExpr):TExpr {
 		var lead = removeLeadingTrivia(eDelete);
 		var trail = removeTrailingTrivia(eDelete);
-		var eDeleteField = mkBuiltin("Reflect.deleteField", tDeleteField, lead);
+		var eDeleteField = mkBuiltin("ASCompat.deleteProperty", tDeleteProperty, lead);
 		var objectExpr:TExpr;
 		var extraLead:Array<Trivia> = [];
 
@@ -71,7 +71,7 @@ class RewriteDelete extends AbstractFilter {
 				// TODO: this should actually generate (expr : ASObject).___delete that handles delection of Dictionary keys too
 				// make sure the expected type is string so further filters add the cast
 				var eindex = if (a.eindex.type != TTString) a.eindex.with(expectedType = TTString) else a.eindex;
-				var eDeleteField = mkBuiltin("Reflect.deleteField", tDeleteField, deleteKeyword.leadTrivia);
+				var eDeleteField = mkBuiltin("ASCompat.deleteProperty", tDeleteProperty, deleteKeyword.leadTrivia);
 				eDelete.with(kind = TECall(eDeleteField, {
 					openParen: new Token(0, TkParenOpen, "(", a.syntax.openBracket.leadTrivia, a.syntax.openBracket.trailTrivia),
 					closeParen: new Token(0, TkParenClose, ")", a.syntax.openBracket.leadTrivia, a.syntax.openBracket.trailTrivia),
@@ -80,7 +80,7 @@ class RewriteDelete extends AbstractFilter {
 
 			case [TTInst(cls), _] if (isDynamicClass(cls) || isProxyClass(cls)):
 				var eindex = if (a.eindex.type != TTString) a.eindex.with(expectedType = TTString) else a.eindex;
-				var eDeleteField = mkBuiltin("Reflect.deleteField", tDeleteField, deleteKeyword.leadTrivia);
+				var eDeleteField = mkBuiltin("ASCompat.deleteProperty", tDeleteProperty, deleteKeyword.leadTrivia);
 				eDelete.with(kind = TECall(eDeleteField, {
 					openParen: new Token(0, TkParenOpen, "(", a.syntax.openBracket.leadTrivia, a.syntax.openBracket.trailTrivia),
 					closeParen: new Token(0, TkParenClose, ")", a.syntax.openBracket.leadTrivia, a.syntax.openBracket.trailTrivia),

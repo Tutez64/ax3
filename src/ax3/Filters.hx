@@ -101,6 +101,7 @@ class Filters {
 			new FixOverrides(context),
 			new CheckUntypedMethodCalls(context),
 			new RemoveRedundantParenthesis(context),
+			new RewriteProxyInheritance(context),
 			new FixImports(context)
 		]);
 

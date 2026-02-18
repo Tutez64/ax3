@@ -126,8 +126,8 @@ class GenHaxe extends PrinterBase {
 		if (i.syntax.condCompBegin != null) printCondCompBegin(i.syntax.condCompBegin);
 
 		var skip = switch i.kind {
-			// skip namespaces and flash.utils.Dictionary (because we generate another type for Dictionaries)
-			case TIDecl({kind: TDNamespace(_) | TDClassOrInterface({parentModule: {parentPack: {name: "flash.utils"}}, name: "Dictionary"})}):
+			// skip namespaces and specific flash imports that are rewritten by compat helpers
+			case TIDecl({kind: TDNamespace(_) | TDClassOrInterface({parentModule: {parentPack: {name: "flash.utils"}}, name: "Dictionary" | "Proxy"})}):
 				var trivia = i.syntax.keyword.leadTrivia.concat(i.syntax.semicolon.trailTrivia);
 				if (!TokenTools.containsOnlyWhitespaceOrNewline(trivia)) {
 					printTrivia(trivia);

@@ -91,16 +91,16 @@ abstract ASAny(Dynamic)
 		}
 		if (!handled) {
 			#if flash
-			result = Reflect.getProperty(obj, name);
+			result = ASCompat.getProperty(obj, name);
 			#elseif js
-			var value:Dynamic = Reflect.getProperty(obj, name);
+			var value:Dynamic = ASCompat.getProperty(obj, name);
 			if (Reflect.isFunction(value)) {
 				result = value.bind(obj); // TODO: maybe we should (ab)use Haxe/JS $bind here for caching the bound methods?
 			} else {
 				result = value;
 			}
 			#else
-			var value:Dynamic = Reflect.getProperty(obj, name);
+			var value:Dynamic = ASCompat.getProperty(obj, name);
 			if (Reflect.isFunction(value)) {
 				result = Reflect.makeVarArgs(function(args:Array<Dynamic>):Dynamic {
 					return Reflect.callMethod(obj, value, args);
@@ -121,8 +121,7 @@ abstract ASAny(Dynamic)
 				return value;
 			}
 		}
-		Reflect.setProperty(this, name, value);
-		return value;
+		return ASCompat.setProperty(this, name, value);
 	}
 
 	@:op(!a) function __not():Bool {
