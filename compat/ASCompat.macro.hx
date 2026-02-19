@@ -52,27 +52,33 @@ class ASCompat {
 	}
 
 	static function setTimeout(closure, delay, arguments:Array<Expr>) {
-		var args = [closure,delay].concat(arguments);
-		var setTimeoutExpr =
-			if (Context.defined("flash"))
-				macro untyped __global__["flash.utils.setTimeout"]
-			else if (Context.defined("js"))
-				macro js.Browser.window.setTimeout
-			else
-				macro ASCompat._setTimeoutNative;
-		return macro @:pos(Context.currentPos()) $setTimeoutExpr($a{args});
+		if (Context.defined("flash")) {
+			var args = [closure, delay].concat(arguments);
+			var setTimeoutExpr = macro untyped __global__["flash.utils.setTimeout"];
+			return macro @:pos(Context.currentPos()) $setTimeoutExpr($a{args});
+		}
+		if (Context.defined("js")) {
+			var args = [closure, delay].concat(arguments);
+			var setTimeoutExpr = macro js.Browser.window.setTimeout;
+			return macro @:pos(Context.currentPos()) $setTimeoutExpr($a{args});
+		}
+		var argsExpr = macro [$a{arguments}];
+		return macro @:pos(Context.currentPos()) ASCompat._setTimeoutNative($closure, $delay, $argsExpr);
 	}
 
 	static function setInterval(closure, delay, arguments:Array<Expr>) {
-		var args = [closure,delay].concat(arguments);
-		var setIntervalExpr =
-			if (Context.defined("flash"))
-				macro untyped __global__["flash.utils.setInterval"]
-			else if (Context.defined("js"))
-				macro js.Browser.window.setInterval
-			else
-				macro ASCompat._setIntervalNative;
-		return macro @:pos(Context.currentPos()) $setIntervalExpr($a{args});
+		if (Context.defined("flash")) {
+			var args = [closure, delay].concat(arguments);
+			var setIntervalExpr = macro untyped __global__["flash.utils.setInterval"];
+			return macro @:pos(Context.currentPos()) $setIntervalExpr($a{args});
+		}
+		if (Context.defined("js")) {
+			var args = [closure, delay].concat(arguments);
+			var setIntervalExpr = macro js.Browser.window.setInterval;
+			return macro @:pos(Context.currentPos()) $setIntervalExpr($a{args});
+		}
+		var argsExpr = macro [$a{arguments}];
+		return macro @:pos(Context.currentPos()) ASCompat._setIntervalNative($closure, $delay, $argsExpr);
 	}
 
 	static function vectorSpliceAll<T>(a:Expr, startIndex:Expr):Expr {

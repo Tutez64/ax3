@@ -205,6 +205,30 @@ class TestASCompat extends utest.Test {
 		#end
 	}
 
+	function testSetIntervalAndTimeoutWithoutExtraArgs() {
+		var ranInterval = false;
+		var intervalId = ASCompat.setInterval(function() {
+			ranInterval = true;
+		}, 1000);
+		isTrue(intervalId > 0);
+		ASCompat.clearInterval(intervalId);
+		isFalse(ranInterval);
+
+		var ranTimeout = false;
+		var timeoutId = ASCompat.setTimeout(function() {
+			ranTimeout = true;
+		}, 1000);
+		isTrue(timeoutId > 0);
+		ASCompat.clearTimeout(timeoutId);
+		isFalse(ranTimeout);
+	}
+
+	function testPauseForGCIfCollectionImminent() {
+		ASCompat.pauseForGCIfCollectionImminent();
+		ASCompat.pauseForGCIfCollectionImminent(0.5);
+		pass();
+	}
+
 	function testTypeof() {
 		equals("function", ASCompat.typeof(function() {}));
 		equals("number", ASCompat.typeof(1));
