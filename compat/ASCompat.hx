@@ -541,6 +541,76 @@ class ASCompat {
 		return if (Reflect.isFunction(v)) v else null;
 	}
 
+	public static function pauseForGCIfCollectionImminent(?imminence:Float):Void {
+		var threshold = normalizeGcImminence(imminence);
+		#if flash
+		#if air
+		try {
+			flash.system.System.pauseForGCIfCollectionImminent(threshold);
+			return;
+		} catch (_:Dynamic) {}
+		#end
+		try {
+			flash.system.System.gc();
+		} catch (_:Dynamic) {}
+		#elseif cpp
+		var reserved = cpp.vm.Gc.memInfo(cpp.vm.Gc.MEM_INFO_RESERVED);
+		var current = cpp.vm.Gc.memInfo(cpp.vm.Gc.MEM_INFO_CURRENT);
+		var pressure = if (reserved <= 0) 1.0 else clamp01(current / reserved);
+		if (pressure >= threshold && shouldRunManualGcNow(threshold)) {
+			cpp.vm.Gc.run(false);
+			markManualGcRun();
+		}
+		#elseif (hl || neko || java || cs || php || python || lua)
+		if (shouldRunManualGcNow(threshold)) {
+			Sys.gc();
+			markManualGcRun();
+		}
+		#elseif js
+		if (shouldRunManualGcNow(threshold)) {
+			var gcMethod = Reflect.field(js.Lib.global, "gc");
+			if (gcMethod != null && Reflect.isFunction(gcMethod)) {
+				Reflect.callMethod(js.Lib.global, gcMethod, []);
+				markManualGcRun();
+			}
+		}
+		#end
+	}
+
+	static inline function normalizeGcImminence(imminence:Null<Float>):Float {
+		// Match AIR semantics:
+		// - null or NaN => 0.75
+		// - < 0 => 0.25
+		// - > 1 => 1.0
+		if (imminence == null || Math.isNaN(imminence)) return 0.75;
+		if (imminence < 0) return 0.25;
+		if (imminence > 1) return 1.0;
+		return imminence;
+	}
+
+	static inline function clamp01(v:Float):Float {
+		return if (v < 0) 0 else if (v > 1) 1 else v;
+	}
+
+	#if !flash
+	static var _lastManualGcAt:Float = -1.0;
+
+	static inline function markManualGcRun():Void {
+		_lastManualGcAt = Timer.stamp();
+	}
+
+	static inline function shouldRunManualGcNow(threshold:Float):Bool {
+		if (_lastManualGcAt < 0) return true;
+		var elapsed = Timer.stamp() - _lastManualGcAt;
+		return elapsed >= gcMinIntervalSeconds(threshold);
+	}
+
+	static inline function gcMinIntervalSeconds(threshold:Float):Float {
+		// Lower threshold => more aggressive GC requests.
+		return 0.1 + threshold * 4.9;
+	}
+	#end
+
 	public static macro function setTimeout(closure:ExprOf<haxe.Constraints.Function>, delay:ExprOf<Float>, arguments:Array<Expr>):ExprOf<UInt>;
 
 	public static inline function clearTimeout(id:UInt):Void {

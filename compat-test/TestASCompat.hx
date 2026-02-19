@@ -226,6 +226,8 @@ class TestASCompat extends utest.Test {
 	function testPauseForGCIfCollectionImminent() {
 		ASCompat.pauseForGCIfCollectionImminent();
 		ASCompat.pauseForGCIfCollectionImminent(0.5);
+		ASCompat.pauseForGCIfCollectionImminent(-1);
+		ASCompat.pauseForGCIfCollectionImminent(2);
 		pass();
 	}
 

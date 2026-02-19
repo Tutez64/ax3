@@ -74,6 +74,7 @@ class Filters {
 			new DateApi(context),
 			new ArrayApi(context),
 			new FiltersApi(context),
+			new SystemApi(context),
 			new StringApi(context),
 			new TextFieldApi(context),
 			new DisplayObjectContainerApi(context),
