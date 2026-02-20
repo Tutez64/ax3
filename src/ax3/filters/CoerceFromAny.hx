@@ -8,6 +8,9 @@ import ax3.TypedTreeTools.*;
 class CoerceFromAny extends AbstractFilter {
 	override function processExpr(e:TExpr):TExpr {
 		e = mapExpr(processExpr, e);
+		if (shouldRetypeUntypedArrayLiteral(e)) {
+			return retypeUntypedArrayLiteral(e);
+		}
 		if (!shouldCoerce(e)) {
 			return e;
 		}
@@ -117,5 +120,39 @@ class CoerceFromAny extends AbstractFilter {
 			case TELiteral(_): true;
 			case _: false;
 		}
+	}
+
+	static function shouldRetypeUntypedArrayLiteral(e:TExpr):Bool {
+		var ebase = skipParens(e);
+		if (!ebase.type.match(TTArray(TTAny) | TTArray(TTObject(TTAny)))) {
+			return false;
+		}
+		if (!ebase.expectedType.match(TTAny | TTObject(TTAny))) {
+			return false;
+		}
+		return switch ebase.kind {
+			case TEArrayDecl(arr):
+				hasHeterogeneousElementTypes(arr);
+			case _:
+				false;
+		}
+	}
+
+	static function hasHeterogeneousElementTypes(arr:TArrayDecl):Bool {
+		if (arr.elements.length < 2) {
+			return false;
+		}
+		var firstType = skipParens(arr.elements[0].expr).type;
+		for (i in 1...arr.elements.length) {
+			if (!typeEq(skipParens(arr.elements[i].expr).type, firstType)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	static function retypeUntypedArrayLiteral(e:TExpr):TExpr {
+		var inner = e.with(expectedType = e.type);
+		return e.with(kind = TEHaxeRetype(inner));
 	}
 }

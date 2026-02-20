@@ -3,6 +3,7 @@
  * Covers:
  * - ASAny to class types.
  * - ASAny to array types.
+ * - Untyped array literals mixing different types in ASAny context.
  */
 package {
     import flash.display.Sprite;
@@ -19,6 +20,12 @@ package {
 
             var anyArray:* = [1, 2, 3];
             var arr:Array = anyArray;
+
+            var mixedStore:Object = {};
+            var fn:Function = function():void {};
+            var args:Array = [1, 2, 3];
+            mixedStore["bind"] = [fn, args];
+            mixedStore["menu"] = new Array(10, args, "label");
         }
     }
 }
