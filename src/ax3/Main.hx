@@ -61,7 +61,7 @@ class Main {
 		var haxeDir = FileSystem.absolutePath(config.hxout);
 		t = stamp();
 		for (packName => pack in tree.packages) {
-			var normalizedPackName = Utils.normalizePackageName(packName);
+			var normalizedPackName = Utils.normalizePackageName(packName, config.packagePartRenames);
 
 			var dir = Path.join({
 				var parts = normalizedPackName.split(".");

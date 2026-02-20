@@ -37,6 +37,7 @@ typedef Config = {
 	var ?src:EitherType<String,Array<String>>;
 	var ?swc:Array<String>;
 	var ?skipFiles:Array<String>;
+	var ?packagePartRenames:DynamicAccess<String>;
 	var ?hxout:String;
 	var ?injection:InjectionConfig;
 	var ?haxeTypes:DynamicAccess<HaxeTypeAnnotation>;

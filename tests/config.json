@@ -4,5 +4,8 @@
   "swc": [
     "tests/lib/airglobal.swc"
   ],
+  "packagePartRenames": {
+    "floor": "floorpkg"
+  },
   "testCloneExpr": true
 }

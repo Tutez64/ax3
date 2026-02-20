@@ -1,6 +1,7 @@
 package ax3;
 
 import sys.FileSystem;
+import haxe.DynamicAccess;
 
 class Utils {
 	public static inline function print(s:String) {
@@ -34,9 +35,19 @@ class Utils {
 		}
 	}
 
-	public static inline function normalizePackagePart(part:String):String {
+	public static function normalizePackagePart(part:String, ?renames:DynamicAccess<String>):String {
 		if (part.length == 0) return part;
-		return part.charAt(0).toLowerCase() + part.substring(1);
+		var normalized = part.charAt(0).toLowerCase() + part.substring(1);
+		if (renames != null) {
+			var renamed = renames[part];
+			if (renamed == null || renamed == "") {
+				renamed = renames[normalized];
+			}
+			if (renamed != null && renamed != "") {
+				return renamed;
+			}
+		}
+		return normalized;
 	}
 
 	public static inline function normalizeTypeName(name:String):String {
@@ -45,11 +56,11 @@ class Utils {
 		return if (first >= "a" && first <= "z") first.toUpperCase() + name.substring(1) else name;
 	}
 
-	public static function normalizePackageName(packName:String):String {
+	public static function normalizePackageName(packName:String, ?renames:DynamicAccess<String>):String {
 		if (packName == "") return packName;
 		var parts = packName.split(".");
 		for (i in 0...parts.length) {
-			parts[i] = normalizePackagePart(parts[i]);
+			parts[i] = normalizePackagePart(parts[i], renames);
 		}
 		return parts.join(".");
 	}

@@ -59,7 +59,7 @@ class GenHaxe extends PrinterBase {
 	}
 
 	inline function normalizePackagePart(part:String):String {
-		return Utils.normalizePackagePart(part);
+		return Utils.normalizePackagePart(part, context.config.packagePartRenames);
 	}
 
 	inline function normalizeTypeName(name:String):String {
@@ -922,8 +922,8 @@ class GenHaxe extends PrinterBase {
 		return false;
 	}
 
-	static function makeFQN(cls:TClassOrInterfaceDecl) {
-		var packName = cls.parentModule == null ? "" : Utils.normalizePackageName(cls.parentModule.parentPack.name);
+	function makeFQN(cls:TClassOrInterfaceDecl) {
+		var packName = cls.parentModule == null ? "" : Utils.normalizePackageName(cls.parentModule.parentPack.name, context.config.packagePartRenames);
 		var typeName = Utils.normalizeTypeName(cls.name);
 		return if (packName == "") typeName else packName + "." + typeName;
 	}
