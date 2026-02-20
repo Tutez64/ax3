@@ -6,6 +6,7 @@ import ax3.filters.*;
 class Filters {
 	public static function run(context:Context, tree:TypedTree) {
 		var externImports = new ExternModuleLevelImports(context);
+		var detectCppMacroConflicts = new CppMacroConflicts.DetectCppMacroConflicts(context);
 		var coerceToBool = new CoerceToBool(context);
 		var detectFieldRedefinitions = new RewriteRedefinedPrivate.DetectFieldRedefinitions(context);
 		var detectStaticInstanceConflicts = new HandleStaticInstanceConflict.DetectStaticInstanceConflicts(context);
@@ -16,6 +17,8 @@ class Filters {
 		var filters:Array<AbstractFilter> = [];
 		if (cloneExprSmokeEarly != null) filters.push(cloneExprSmokeEarly);
 		filters = filters.concat([
+			detectCppMacroConflicts,
+			new CppMacroConflicts.RenameCppMacroConflicts(context, detectCppMacroConflicts),
 			detectFieldRedefinitions,
 			detectStaticInstanceConflicts,
 			new RewriteRedefinedPrivate.RenameRedefinedFields(context, detectFieldRedefinitions),
