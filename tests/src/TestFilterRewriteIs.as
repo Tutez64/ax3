@@ -3,15 +3,19 @@
  * `x is Function` should become `Reflect.isFunction(x)`.
  * `x is Object` should become `x != null`.
  * XML/XMLList should use a typeReference() helper to avoid abstract-as-value issues.
+ * ByteArray should use ASCompat.isByteArray helper to avoid abstract-as-value issues.
  * Other types should use `Std.isOfType`.
  */
 package {
+    import flash.utils.ByteArray;
+
     public class TestFilterRewriteIs {
         public function TestFilterRewriteIs() {
             var any:Object = {};
             var isFunc:Boolean = (any is Function);
             var isObj:Boolean = (any is Object);
             var isString:Boolean = (any is String);
+            var isByteArray:Boolean = (any is ByteArray);
             var isXml:Boolean = (any is XML);
             var isXmlList:Boolean = (any is XMLList);
         }

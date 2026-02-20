@@ -299,6 +299,20 @@ class TestASCompat extends utest.Test {
 		equals(null, ASCompat.asXMLList(xml));
 	}
 
+	function testIsByteArray() {
+		var bytes = new flash.utils.ByteArray();
+		isTrue(ASCompat.isByteArray(bytes));
+		isFalse(ASCompat.isByteArray("test"));
+		isFalse(ASCompat.isByteArray(null));
+	}
+
+	function testAsByteArray() {
+		var bytes = new flash.utils.ByteArray();
+		equals(bytes, ASCompat.asByteArray(bytes));
+		equals(null, ASCompat.asByteArray("test"));
+		equals(null, ASCompat.asByteArray(null));
+	}
+
 	function testToString() {
 		equals("123", ASCompat.toString(123));
 		equals("true", ASCompat.toString(true));

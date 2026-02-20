@@ -2,6 +2,7 @@
  * Test case for CoerceFromAny filter.
  * Covers:
  * - ASAny to class types.
+ * - ASAny to ByteArray via ASCompat.asByteArray helper.
  * - ASAny to array types.
  * - Untyped array literals mixing different types in ASAny context.
  */
@@ -9,6 +10,7 @@ package {
     import flash.display.Sprite;
     import flash.filters.BitmapFilter;
     import flash.filters.BlurFilter;
+    import flash.utils.ByteArray;
 
     public class TestFilterCoerceFromAny {
         public function TestFilterCoerceFromAny() {
@@ -18,6 +20,8 @@ package {
             var anyFilter:* = new BlurFilter();
             var filter:BitmapFilter = anyFilter;
 
+            this.acceptAnyBytes(new ByteArray());
+
             var anyArray:* = [1, 2, 3];
             var arr:Array = anyArray;
 
@@ -26,6 +30,10 @@ package {
             var args:Array = [1, 2, 3];
             mixedStore["bind"] = [fn, args];
             mixedStore["menu"] = new Array(10, args, "label");
+        }
+
+        private function acceptAnyBytes(value:*):void {
+            var bytes:ByteArray = value;
         }
     }
 }

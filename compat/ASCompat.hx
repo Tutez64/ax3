@@ -369,6 +369,22 @@ class ASCompat {
 		#end
 	}
 
+	public static inline function isByteArray(v:Any):Bool {
+		#if flash
+		return Std.isOfType(v, flash.utils.ByteArray);
+		#else
+		return Std.isOfType(v, openfl.utils.ByteArray.ByteArrayData);
+		#end
+	}
+
+	public static inline function asByteArray(v:Dynamic):flash.utils.ByteArray {
+		#if flash
+		return flash.Lib.as(v, flash.utils.ByteArray);
+		#else
+		return cast flash.Lib.as(v, openfl.utils.ByteArray.ByteArrayData);
+		#end
+	}
+
 	public static inline function typeof(value:Dynamic):String {
 		#if js
 		return js.Syntax.typeof(value);

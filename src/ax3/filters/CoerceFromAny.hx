@@ -17,6 +17,8 @@ class CoerceFromAny extends AbstractFilter {
 		return switch e.expectedType {
 			case TTFunction | TTFun(_):
 				wrapAsFunction(e);
+			case TTInst(cls) if (isByteArrayClass(cls)):
+				wrapAsByteArray(e);
 			case TTInst(cls) if (cls.name != "String"):
 				wrapDynamicAs(e, cls, e.expectedType);
 			case TTObject(TTAny): // ASObject
@@ -35,6 +37,17 @@ class CoerceFromAny extends AbstractFilter {
 		var lead = removeLeadingTrivia(e);
 		var trail = removeTrailingTrivia(e);
 		var eMethod = mkBuiltin("ASCompat.asFunction", TTFunction, lead);
+		return mk(TECall(eMethod, {
+			openParen: mkOpenParen(),
+			args: [{expr: e, comma: null}],
+			closeParen: mkCloseParen(trail)
+		}), e.expectedType, e.expectedType);
+	}
+
+	function wrapAsByteArray(e:TExpr):TExpr {
+		var lead = removeLeadingTrivia(e);
+		var trail = removeTrailingTrivia(e);
+		var eMethod = mkBuiltin("ASCompat.asByteArray", TTFunction, lead);
 		return mk(TECall(eMethod, {
 			openParen: mkOpenParen(),
 			args: [{expr: e, comma: null}],
@@ -113,6 +126,14 @@ class CoerceFromAny extends AbstractFilter {
 
 	static inline function isAnyLike(t:TType):Bool {
 		return t.match(TTAny | TTObject(TTAny));
+	}
+
+	static function isByteArrayClass(cls:TClassOrInterfaceDecl):Bool {
+		if (cls.name != "ByteArray") {
+			return false;
+		}
+		var pack = cls.parentModule.parentPack.name;
+		return pack == "" || pack == "flash.utils" || pack == "openfl.utils";
 	}
 
 	static function isLiteral(e:TExpr):Bool {

@@ -1,5 +1,8 @@
 package ax3.filters;
 
+import ax3.ParseTree;
+using StringTools;
+
 class RewriteIs extends AbstractFilter {
 	static final tStdIs = TTFun([TTAny, TTAny], TTBoolean);
 	static final tIsFunction = TTFun([TTAny], TTBoolean);
@@ -8,7 +11,14 @@ class RewriteIs extends AbstractFilter {
 		e = mapExpr(processExpr, e);
 		return switch e.kind {
 			case TEBinop(a, OpIs(isToken), b):
-				switch b.kind {
+				if (isByteArrayTypeExpr(b)) {
+					final isByteArray = mkBuiltin("ASCompat.isByteArray", tIsFunction, removeLeadingTrivia(e));
+					e.with(kind = TECall(isByteArray, {
+						openParen: mkOpenParen(),
+						args: [{expr: a, comma: null}],
+						closeParen: mkCloseParen(removeTrailingTrivia(e)),
+					}));
+				} else switch b.kind {
 					case TEBuiltin(_, "Function"):
 						final isFunction = mkBuiltin("Reflect.isFunction", tIsFunction, removeLeadingTrivia(e));
 						e.with(kind = TECall(isFunction, {
@@ -49,5 +59,42 @@ class RewriteIs extends AbstractFilter {
 			case _:
 				e;
 		}
+	}
+
+	static function isByteArrayTypeExpr(e:TExpr):Bool {
+		switch e.kind {
+			case TEBuiltin(_, name):
+				if (name == "ByteArray" || name.endsWith(".ByteArray")) {
+					return true;
+				}
+			case TEDeclRef(path, c):
+				switch c.kind {
+					case TDClassOrInterface(cls):
+						if (isByteArrayClass(cls)) {
+							return true;
+						}
+					case _:
+				}
+				var name = ParseTree.dotPathToString(path);
+				if (name == "ByteArray" || name.endsWith(".ByteArray")) {
+					return true;
+				}
+			case _:
+		}
+
+		return switch e.type {
+			case TTStatic(cls) | TTInst(cls):
+				isByteArrayClass(cls);
+			case _:
+				false;
+		}
+	}
+
+	static function isByteArrayClass(cls:TClassOrInterfaceDecl):Bool {
+		if (cls.name != "ByteArray") {
+			return false;
+		}
+		var pack = cls.parentModule.parentPack.name;
+		return pack == "" || pack == "flash.utils" || pack == "openfl.utils";
 	}
 }
