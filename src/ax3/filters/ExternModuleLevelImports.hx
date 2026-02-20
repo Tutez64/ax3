@@ -81,7 +81,10 @@ class ExternModuleLevelImports extends AbstractFilter {
 
 	static function isIgnoredImport(path:String) return switch path {
 		case "flash.utils.getDefinitionByName" // rewritten by UtilFunctions (TODO maybe the list should be in UtilFunctions)
-		//    | "flash.utils.getQualifiedClassName"
+		   | "flash.utils.getQualifiedClassName"
+		   | "avmplus.getQualifiedClassName"
+		   | "flash.profiler.showRedrawRegions"
+		   | "flash.utils.flash_proxy"
 		   | "flash.utils.getTimer"
 		   | "flash.utils.describeType"
 		   | "flash.utils.setTimeout"

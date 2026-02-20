@@ -319,6 +319,20 @@ class TestASCompat extends utest.Test {
 		equals("null", ASCompat.toString(null));
 	}
 
+	function testGetQualifiedClassName() {
+		equals("int", ASCompat.getQualifiedClassName(123));
+		equals("Number", ASCompat.getQualifiedClassName(123.5));
+		equals("Boolean", ASCompat.getQualifiedClassName(true));
+		equals("String", ASCompat.getQualifiedClassName("test"));
+		equals("Array", ASCompat.getQualifiedClassName([1, 2, 3]));
+		equals("null", ASCompat.getQualifiedClassName(null));
+	}
+
+	function testShowRedrawRegions() {
+		ASCompat.showRedrawRegions(false, 0);
+		pass();
+	}
+
 	function testToNumberField() {
 		// Test with existing field - should return the numeric value
 		var obj:ASObject = {value: 42};

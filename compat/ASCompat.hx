@@ -57,6 +57,20 @@ class ASCompat {
 		#end
 	}
 
+	public static inline function getQualifiedClassName(value:Any):String {
+		#if flash
+		return untyped __global__["flash.utils.getQualifiedClassName"](value);
+		#else
+		return getQualifiedClassNameNonFlash(value);
+		#end
+	}
+
+	public static inline function showRedrawRegions(show:Bool, color:Int):Void {
+		#if flash
+		untyped __global__["flash.profiler.showRedrawRegions"](show, color);
+		#end
+	}
+
 	#if !flash
 	static function describeTypeNonFlash(value:Dynamic):compat.XML {
 		var isClassObject = Std.isOfType(value, Class);
@@ -83,6 +97,36 @@ class ASCompat {
 		}
 
 		return cast root;
+	}
+
+	static function getQualifiedClassNameNonFlash(value:Dynamic):String {
+		if (value == null) return "null";
+		if (Std.isOfType(value, Int)) return "int";
+		if (Std.isOfType(value, Float)) return "Number";
+		if (Std.isOfType(value, Bool)) return "Boolean";
+		if (Std.isOfType(value, String)) return "String";
+		if (Std.isOfType(value, Array)) return "Array";
+		if (Reflect.isFunction(value)) return "Function";
+		if (Std.isOfType(value, Class)) {
+			var className = Type.getClassName(cast value);
+			return className != null ? className : "Class";
+		}
+
+		var cls = Type.getClass(value);
+		if (cls != null) {
+			var className = Type.getClassName(cls);
+			if (isVectorClassName(className)) {
+				return "__AS3__.vec::Vector.<*>";
+			}
+			return className != null ? className : "Object";
+		}
+
+		return "Object";
+	}
+
+	static inline function isVectorClassName(className:Null<String>):Bool {
+		if (className == null) return false;
+		return className == "flash.Vector" || className == "openfl.Vector" || className.indexOf("Vector") != -1;
 	}
 
 	static function describeTypeName(value:Dynamic, cls:Class<Dynamic>, isClassObject:Bool):String {
