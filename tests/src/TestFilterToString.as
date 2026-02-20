@@ -4,6 +4,7 @@
  * - Error.toString() should be rewritten to Std.string to avoid missing method on flash.errors.Error.
  * - Custom class with its own toString should remain unchanged.
  * - Primitive toString() and radix toString() stay mapped correctly.
+ * - String concatenation with dynamic values should stringify dynamic operands to avoid hxcpp invalid numeric branch.
  */
 package {
     public class TestFilterToString {
@@ -21,6 +22,16 @@ package {
 
             var flag:Boolean = true;
             trace(flag.toString());
+
+            var any:* = {};
+            any.value = 42;
+            var dyn:* = passthrough(any.value);
+            trace("prefix=" + dyn);
+            trace(dyn + "=suffix");
+        }
+
+        private function passthrough(value:*):* {
+            return value;
         }
     }
 }

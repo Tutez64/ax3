@@ -8,6 +8,9 @@ class ToString extends AbstractFilter {
 	override function processExpr(e:TExpr):TExpr {
 		e = mapExpr(processExpr, e);
 		return switch e.kind {
+			case TEBinop(a, op = OpAdd(_), b):
+				rewriteStringConcatBinop(e, a, op, b);
+
 			case TECall({kind: TEField({kind: TOExplicit(_, eValue = {type: t})}, "toString", _)}, args = {args: []}) if (shouldRewriteInstToString(t)):
 				var eStdString = mkBuiltin("Std.string", tStdString, removeLeadingTrivia(eValue));
 				e.with(kind = TECall(eStdString, args.with(args = [{expr: eValue, comma: null}])));
@@ -57,6 +60,40 @@ class ToString extends AbstractFilter {
 						e;
 				}
 		}
+	}
+
+	function rewriteStringConcatBinop(e:TExpr, a:TExpr, op:Binop, b:TExpr):TExpr {
+		if (!isStringLike(a.type) && !isStringLike(b.type)) {
+			return e;
+		}
+
+		var a2 = if (isStringLike(b.type) && shouldStringifyInConcat(a.type)) mkStdString(a) else a;
+		var b2 = if (isStringLike(a.type) && shouldStringifyInConcat(b.type)) mkStdString(b) else b;
+
+		if (a2 == a && b2 == b) {
+			return e;
+		}
+		return e.with(kind = TEBinop(a2, op, b2));
+	}
+
+	static inline function isStringLike(t:TType):Bool {
+		return t.match(TTString | TTXML | TTXMLList);
+	}
+
+	static inline function shouldStringifyInConcat(t:TType):Bool {
+		return t.match(TTAny | TTObject(_) | TTBuiltin);
+	}
+
+	static function mkStdString(e:TExpr):TExpr {
+		var eStdString = mkBuiltin("Std.string", tStdString, removeLeadingTrivia(e));
+		return e.with(
+			kind = TECall(eStdString, {
+				openParen: mkOpenParen(),
+				args: [{expr: e, comma: null}],
+				closeParen: mkCloseParen(removeTrailingTrivia(e))
+			}),
+			type = TTString
+		);
 	}
 
 	static function shouldRewriteInstToString(t:TType):Bool {
