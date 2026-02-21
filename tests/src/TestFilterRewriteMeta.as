@@ -4,7 +4,7 @@ package {
 
 	// Class Metadata Tests
 	[Embed(source="/_assets/assets.swf", symbol="symbol27")]
-	// Expected: @:native("symbol27")
+	// Expected: @:bind + @:native("symbol27")
 	[Embed(source="font.ttf", mimeType="application/x-font")]
 	// Expected: @:font("font.ttf")
 	[Embed(source="data.bin", mimeType="application/octet-stream")]

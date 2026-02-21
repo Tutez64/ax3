@@ -50,7 +50,7 @@ class RewriteMeta extends AbstractFilter {
 			switch meta {
 				case MetaFlash(m):
 					if (m.name.text == "Embed") {
-						newClassMetadata.push(processEmbed(m));
+						newClassMetadata = newClassMetadata.concat(processEmbed(m, true));
 					} else {
 						newClassMetadata.push(meta);
 					}
@@ -176,7 +176,7 @@ class RewriteMeta extends AbstractFilter {
 										// 		case TFVar(_): throwError(m.name.pos, "Inline meta on a var?");
 										// 	}
 									case "Embed":
-										newMetadata.push(processEmbed(m));
+										newMetadata = newMetadata.concat(processEmbed(m, false));
 									case other:
 										reportError(m.name.pos, "Unknown metadata: " + other);
 										newMetadata.push(meta);
@@ -214,7 +214,7 @@ class RewriteMeta extends AbstractFilter {
 		}
 	}
 
-	function processEmbed(m: ParseTree.Metadata): TMetadata {
+	function processEmbed(m: ParseTree.Metadata, addBindForSymbol:Bool): Array<TMetadata> {
 		var map: Map<String, String> = [for (a in m.args.args.rest.map(function(f) return f.element).concat([m.args.args.first])) {
 			var kv: {k: String, v: String} = switch a {
 				case EBinop(EIdent(n), OpAssign(_), ELiteral(LString(v))):
@@ -225,8 +225,17 @@ class RewriteMeta extends AbstractFilter {
 			if (kv != null) kv.k => kv.v;
 		}];
 		if (map.exists('symbol')) {
-			return MetaHaxe(
-				mkIdent('@:native', m.openBracket.leadTrivia, []),
+			var result:Array<TMetadata> = [];
+			var nativeLeadTrivia = m.openBracket.leadTrivia;
+			if (addBindForSymbol) {
+				nativeLeadTrivia = [];
+				result.push(MetaHaxe(
+					mkIdent("@:bind", m.openBracket.leadTrivia, makeMetaSeparatorTrivia(m.openBracket.leadTrivia)),
+					null
+				));
+			}
+			result.push(MetaHaxe(
+				mkIdent('@:native', nativeLeadTrivia, []),
 				{
 					openParen: mkOpenParen(),
 					args: {
@@ -235,10 +244,11 @@ class RewriteMeta extends AbstractFilter {
 					},
 					closeParen: mkCloseParen(m.closeBracket.trailTrivia)
 				}
-			);
+			));
+			return result;
 		} else switch map['mimeType'] {
 			case "application/x-font", "application/x-font-truetype":
-				return MetaHaxe(
+				return [MetaHaxe(
 					mkIdent('@:font', m.openBracket.leadTrivia, []),
 					{
 						openParen: mkOpenParen(),
@@ -248,9 +258,9 @@ class RewriteMeta extends AbstractFilter {
 						},
 						closeParen: mkCloseParen(m.closeBracket.trailTrivia)
 					}
-				);
+				)];
 			case "application/octet-stream":
-				return MetaHaxe(
+				return [MetaHaxe(
 					mkIdent('@:file', m.openBracket.leadTrivia, []),
 					{
 						openParen: mkOpenParen(),
@@ -260,9 +270,9 @@ class RewriteMeta extends AbstractFilter {
 						},
 						closeParen: mkCloseParen(m.closeBracket.trailTrivia)
 					}
-				);
+				)];
 			case null:
-				return MetaHaxe(
+				return [MetaHaxe(
 					mkIdent('@:bitmap', m.openBracket.leadTrivia, []),
 					{
 						openParen: mkOpenParen(),
@@ -272,11 +282,29 @@ class RewriteMeta extends AbstractFilter {
 						},
 						closeParen: mkCloseParen(m.closeBracket.trailTrivia)
 					}
-				);
+				)];
 			case t:
 				reportError(m.name.pos, "Unknown mimeType: " + t);
-				return MetaFlash(m);
+				return [MetaFlash(m)];
 		}
+	}
+
+	static function makeMetaSeparatorTrivia(leadTrivia:Array<Trivia>):Array<Trivia> {
+		var indent = "";
+		var i = leadTrivia.length - 1;
+		while (i >= 0) {
+			final tr = leadTrivia[i];
+			switch tr.kind {
+				case TrWhitespace:
+					indent = tr.text + indent;
+				case TrNewline:
+					return indent == "" ? [newline] : [newline, new Trivia(TrWhitespace, indent)];
+				case _:
+					return [newline];
+			}
+			i--;
+		}
+		return [newline];
 	}
 
 	function extendsMagicBaseClass(c:TClassOrInterfaceDecl):Bool {
