@@ -304,6 +304,21 @@ class ASCompat {
 		if (proxyGetter != null && Reflect.isFunction(proxyGetter)) {
 			return Reflect.callMethod(obj, proxyGetter, [fieldName]);
 		}
+		var name = propertyName(fieldName);
+		var value = Reflect.getProperty(obj, name);
+		// Preserve explicit null fields/getters; fallback only for missing properties.
+		if (value != null || Reflect.hasField(obj, name)) {
+			return value;
+		}
+		// OpenFL native bindings (e.g. symbols from SWF) often expose timeline instances via children names.
+		var getChildByName = Reflect.field(obj, "getChildByName");
+		if (getChildByName != null && Reflect.isFunction(getChildByName)) {
+			var child = Reflect.callMethod(obj, getChildByName, [name]);
+			if (child != null) {
+				return child;
+			}
+		}
+		return value;
 		#end
 		return Reflect.getProperty(obj, propertyName(fieldName));
 	}
