@@ -1160,6 +1160,7 @@ class GenHaxe extends PrinterBase {
 				importVector();
 				name;
 			case (_.startsWith("ASCompat.") => true)
+			   | (_.startsWith("ASCompatMacro.") => true)
 			   | (_ == RewriteForIn.checkNullIterateeBuiltin => true)
 			   : name;
 			case _:

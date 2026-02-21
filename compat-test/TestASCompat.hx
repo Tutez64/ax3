@@ -380,6 +380,21 @@ class TestASCompat extends utest.Test {
 		equals("renamed", target.name);
 	}
 
+	function testApplyBoundMethod() {
+		var target = new TestASCompatApplyTarget();
+		var pushed = ASCompatMacro.applyBoundMethod(target, "pushValues", [1, 2, 3]);
+		equals(null, pushed);
+		equals(3, target.values.length);
+		equals(1, target.values[0]);
+		equals(3, target.values[2]);
+
+		var sum = ASCompatMacro.applyBoundMethod(target, "sum", [4, 5]);
+		equals(9, sum);
+
+		ASCompatMacro.applyBoundMethod(target, "touch", []);
+		equals(1, target.touchCount);
+	}
+
 	function testDateApi() {
 		var dTime = Date.fromTime(0);
 		ASCompat.ASDate.setTime(dTime, 1234567);
@@ -640,5 +655,24 @@ private class TestASCompatDescribeTarget extends TestASCompatDescribeBase {
 
 	public function instanceMethod():Int {
 		return value;
+	}
+}
+
+private class TestASCompatApplyTarget {
+	public var values:Array<Int> = [];
+	public var touchCount:Int = 0;
+
+	public function new() {}
+
+	public function pushValues(...rest:Dynamic):Void {
+		values = cast rest.toArray();
+	}
+
+	public function sum(a:Int, b:Int):Int {
+		return a + b;
+	}
+
+	public function touch():Void {
+		touchCount++;
 	}
 }
