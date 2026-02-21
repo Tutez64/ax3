@@ -23,20 +23,7 @@ abstract ASAny(Dynamic)
 	}
 
 	public function hasOwnProperty(name:String):Bool {
-		if (Reflect.hasField(this, name)) {
-			return true;
-		}
-		try {
-			var clazz = Type.getClass(this);
-			if (clazz != null) {
-				var fields = Type.getInstanceFields(clazz);
-				return fields.indexOf(name) > -1 || fields.indexOf("get_" + name) > -1 || fields.indexOf("set_" + name) > -1;
-			}
-		} catch (e:Dynamic) {
-			// Type.getClass can fail on some Flash objects (MovieClip, dynamically loaded objects)
-			// In this case, fall back to Reflect.hasField which we already checked
-		}
-		return false;
+		return ASCompat.hasProperty(this, name);
 	}
 
 	#if flash

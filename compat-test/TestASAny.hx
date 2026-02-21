@@ -226,6 +226,13 @@ class TestASAny extends utest.Test {
 		isFalse(c.hasOwnProperty("wat"));
 	}
 
+	function testHasOwnPropertyWithMovieClipDynamicField() {
+		var clip:ASAny = new flash.display.MovieClip();
+		isFalse(clip.hasOwnProperty("extra"));
+		clip.extra = 123;
+		isTrue(clip.hasOwnProperty("extra"));
+	}
+
 	@:analyzer(no_optimize)
 	function testArithmetics() {
 		var a:ASAny = 1;

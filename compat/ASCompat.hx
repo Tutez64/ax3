@@ -4,6 +4,8 @@ import haxe.macro.Expr;
 
 import haxe.Constraints.Function;
 import haxe.ds.IntMap;
+import haxe.ds.ObjectMap;
+import haxe.ds.StringMap;
 import haxe.Timer;
 using StringTools;
 
@@ -16,6 +18,14 @@ class ASCompat {
 	public static inline final MAX_FLOAT = 1.7976931348623157e+308;
 	// Represents the smallest positive Number value in AS3 (Number.MIN_VALUE)
 	public static inline final MIN_FLOAT = 4.9406564584124654e-324;
+
+	#if !flash
+	#if cpp
+	static final dynamicPropertyStore:haxe.ds.WeakMap<{}, StringMap<Dynamic>> = new haxe.ds.WeakMap();
+	#else
+	static final dynamicPropertyStore:ObjectMap<{}, StringMap<Dynamic>> = new ObjectMap();
+	#end
+	#end
 
 	public static inline function checkNullIteratee<T>(v:Null<T>, ?pos:haxe.PosInfos):Bool {
 		if (v == null) {
@@ -305,10 +315,18 @@ class ASCompat {
 			return Reflect.callMethod(obj, proxyGetter, [fieldName]);
 		}
 		var name = propertyName(fieldName);
-		var value = Reflect.getProperty(obj, name);
-		// Preserve explicit null fields/getters; fallback only for missing properties.
-		if (value != null || Reflect.hasField(obj, name)) {
-			return value;
+		var value:Dynamic = null;
+		try {
+			value = Reflect.getProperty(obj, name);
+			// Preserve explicit null fields/getters; fallback only for missing properties.
+			if (value != null || hasReflectedProperty(obj, name)) {
+				return value;
+			}
+		} catch (_:Dynamic) {
+		}
+		var dynamicProperties = getDynamicProperties(obj, false);
+		if (dynamicProperties != null && dynamicProperties.exists(name)) {
+			return dynamicProperties.get(name);
 		}
 		// OpenFL native bindings (e.g. symbols from SWF) often expose timeline instances via children names.
 		var getChildByName = Reflect.field(obj, "getChildByName");
@@ -333,6 +351,18 @@ class ASCompat {
 			Reflect.callMethod(obj, proxySetter, [fieldName, value]);
 			return value;
 		}
+		var name = propertyName(fieldName);
+		var setError:Dynamic = null;
+		try {
+			Reflect.setProperty(obj, name, value);
+			return value;
+		} catch (e:Dynamic) {
+			setError = e;
+		}
+		if (!hasReflectedProperty(obj, name) && setDynamicProperty(obj, name, value)) {
+			return value;
+		}
+		throw setError;
 		#end
 		Reflect.setProperty(obj, propertyName(fieldName), value);
 		return value;
@@ -347,13 +377,88 @@ class ASCompat {
 		if (proxyDelete != null && Reflect.isFunction(proxyDelete)) {
 			return toBool(Reflect.callMethod(obj, proxyDelete, [fieldName]));
 		}
+		var name = propertyName(fieldName);
+		var deleted = false;
+		try {
+			deleted = Reflect.deleteField(obj, name);
+		} catch (_:Dynamic) {
+		}
+		var dynamicProperties = getDynamicProperties(obj, false);
+		if (dynamicProperties != null && dynamicProperties.exists(name)) {
+			dynamicProperties.remove(name);
+			return true;
+		}
+		return deleted;
 		#end
 		return Reflect.deleteField(obj, propertyName(fieldName));
+	}
+
+	public static function hasProperty(obj:Dynamic, fieldName:Dynamic):Bool {
+		if (obj == null) {
+			return false;
+		}
+		var name = propertyName(fieldName);
+		if (hasReflectedProperty(obj, name)) {
+			return true;
+		}
+		#if !flash
+		var dynamicProperties = getDynamicProperties(obj, false);
+		if (dynamicProperties != null && dynamicProperties.exists(name)) {
+			return true;
+		}
+		#end
+		return false;
 	}
 
 	static inline function propertyName(fieldName:Dynamic):String {
 		return Std.string(fieldName);
 	}
+
+	static function hasReflectedProperty(obj:Dynamic, name:String):Bool {
+		try {
+			if (Reflect.hasField(obj, name)) {
+				return true;
+			}
+		} catch (_:Dynamic) {
+		}
+		try {
+			var clazz = Type.getClass(obj);
+			if (clazz != null) {
+				var fields = Type.getInstanceFields(clazz);
+				return fields.indexOf(name) > -1 || fields.indexOf("get_" + name) > -1 || fields.indexOf("set_" + name) > -1;
+			}
+		} catch (_:Dynamic) {
+		}
+		return false;
+	}
+
+	#if !flash
+	static function getDynamicProperties(obj:Dynamic, createIfMissing:Bool):Null<StringMap<Dynamic>> {
+		if (!canUseDynamicPropertyStore(obj)) {
+			return null;
+		}
+		var key:{} = cast obj;
+		var dynamicProperties = dynamicPropertyStore.get(key);
+		if (dynamicProperties == null && createIfMissing) {
+			dynamicProperties = new StringMap<Dynamic>();
+			dynamicPropertyStore.set(key, dynamicProperties);
+		}
+		return dynamicProperties;
+	}
+
+	static function setDynamicProperty(obj:Dynamic, name:String, value:Dynamic):Bool {
+		var dynamicProperties = getDynamicProperties(obj, true);
+		if (dynamicProperties == null) {
+			return false;
+		}
+		dynamicProperties.set(name, value);
+		return true;
+	}
+
+	static function canUseDynamicPropertyStore(obj:Dynamic):Bool {
+		return !Std.isOfType(obj, String) && !Std.isOfType(obj, Int) && !Std.isOfType(obj, Float) && !Std.isOfType(obj, Bool);
+	}
+	#end
 
 	// Boolean(d)
 	public static inline function toBool(d:Dynamic):Bool {

@@ -360,6 +360,26 @@ class TestASCompat extends utest.Test {
 		isFalse(result);
 	}
 
+	function testDynamicPropertyOnMovieClip() {
+		var target = new flash.display.MovieClip();
+		isFalse(ASCompat.hasProperty(target, "extra"));
+
+		ASCompat.setProperty(target, "extra", 42);
+		equals(42, ASCompat.getProperty(target, "extra"));
+		isTrue(ASCompat.hasProperty(target, "extra"));
+
+		ASCompat.setProperty(target, "extra", null);
+		equals(null, ASCompat.getProperty(target, "extra"));
+		isTrue(ASCompat.hasProperty(target, "extra"));
+
+		isTrue(ASCompat.deleteProperty(target, "extra"));
+		equals(null, ASCompat.getProperty(target, "extra"));
+		isFalse(ASCompat.hasProperty(target, "extra"));
+
+		ASCompat.setProperty(target, "name", "renamed");
+		equals("renamed", target.name);
+	}
+
 	function testDateApi() {
 		var dTime = Date.fromTime(0);
 		ASCompat.ASDate.setTime(dTime, 1234567);

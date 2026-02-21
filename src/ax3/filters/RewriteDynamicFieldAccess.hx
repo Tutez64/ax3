@@ -1,14 +1,92 @@
 package ax3.filters;
 
 class RewriteDynamicFieldAccess extends AbstractFilter {
+	static final tSetProperty = TTFun([TTAny, TTString, TTAny], TTAny);
+
 	override function processExpr(e:TExpr):TExpr {
+		e = mapExpr(processExpr, e);
 		return switch e.kind {
+			case TEBinop(lhs = {kind: TEField(obj, fieldName, fieldToken)}, OpAssign(_), rhs)
+				if (shouldRewriteDynamicFieldAssign(obj)):
+				rewriteFieldAssign(e, lhs, obj, fieldName, fieldToken, rhs);
+
 			case TEField(obj, fieldName, fieldToken):
 				var updatedObj = rewriteFieldObject(obj, fieldName, fieldToken);
 				if (updatedObj == obj) e else e.with(kind = TEField(updatedObj, fieldName, fieldToken));
 			case _:
-				mapExpr(processExpr, e);
+				e;
 		}
+	}
+
+	static inline function shouldRewriteDynamicFieldAssign(obj:TFieldObject):Bool {
+		return switch obj.type {
+			case TTAny | TTObject(_) | TTBuiltin:
+				true;
+			case _:
+				false;
+		}
+	}
+
+	function rewriteFieldAssign(original:TExpr, lhs:TExpr, obj:TFieldObject, fieldName:String, fieldToken:Token, rhs:TExpr):TExpr {
+		var lead = removeLeadingTrivia(original);
+		var trail = removeTrailingTrivia(original);
+		var eSetField = mkBuiltin("ASCompat.setProperty", tSetProperty, lead);
+		var objectExpr:TExpr;
+		var extraLead:Array<Trivia> = [];
+
+		switch obj.kind {
+			case TOExplicit(dot, eobj):
+				objectExpr = stripAnyRetype(eobj);
+				extraLead = dot.leadTrivia.concat(dot.trailTrivia);
+
+			case TOImplicitThis(_):
+				objectExpr = mk(TELiteral(TLThis(mkIdent("this", fieldToken.leadTrivia, []))), obj.type, obj.type);
+				fieldToken.leadTrivia = [];
+
+			case TOImplicitClass(cls):
+				objectExpr = mkDeclRef({first: mkIdent(cls.name, fieldToken.leadTrivia, []), rest: []}, {name: cls.name, kind: TDClassOrInterface(cls)}, null);
+				fieldToken.leadTrivia = [];
+		}
+
+		var nameToken = new Token(
+			fieldToken.pos,
+			TkStringDouble,
+			haxe.Json.stringify(fieldName),
+			extraLead.concat(fieldToken.leadTrivia),
+			stripWhitespaceTrivia(fieldToken.trailTrivia)
+		);
+		fieldToken.leadTrivia = [];
+		fieldToken.trailTrivia = [];
+		var eName = mk(TELiteral(TLString(nameToken)), TTString, TTString);
+
+		return mk(TECall(eSetField, {
+			openParen: mkOpenParen(),
+			args: [{expr: objectExpr, comma: commaWithSpace}, {expr: eName, comma: commaWithSpace}, {expr: rhs, comma: null}],
+			closeParen: mkCloseParen(trail)
+		}), lhs.type, original.expectedType);
+	}
+
+	static function stripAnyRetype(e:TExpr):TExpr {
+		return switch e.kind {
+			case TEHaxeRetype(inner) if (e.type == TTAny):
+				stripAnyRetype(inner);
+			case TEParens(_, inner = {kind: TEHaxeRetype(_), type: TTAny}, _):
+				stripAnyRetype(inner);
+			case _:
+				e;
+		}
+	}
+
+	static function stripWhitespaceTrivia(trivia:Array<Trivia>):Array<Trivia> {
+		var result:Array<Trivia> = [];
+		for (item in trivia) {
+			switch item.kind {
+				case TrWhitespace | TrNewline:
+				case _:
+					result.push(item);
+			}
+		}
+		return result;
 	}
 
 	function rewriteFieldObject(obj:TFieldObject, fieldName:String, fieldToken:Token):TFieldObject {
