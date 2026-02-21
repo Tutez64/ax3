@@ -262,6 +262,57 @@ class TestASAny extends utest.Test {
 		var x:ASObject = [1, false, "hi"];
 		same([1, false, "hi"], x);
 	}
+
+	function testDictionaryObjectKeysViaASAny() {
+		var dict:ASDictionary<ASAny, ASAny> = new ASDictionary(true);
+		var key1:ASAny = new Cls(null);
+		var key2:ASAny = new Cls(null);
+		var anyDict:ASAny = dict;
+
+		anyDict[key1] = 123;
+		anyDict[key2] = 456;
+
+		equals(123, anyDict[key1]);
+		equals(456, anyDict[key2]);
+		equals(123, dict[key1]);
+		equals(456, dict[key2]);
+	}
+
+	function testDictionaryObjectKeyOverwriteViaASAny() {
+		var dict:ASDictionary<ASAny, ASAny> = new ASDictionary(true);
+		var key:ASAny = new Cls(null);
+		var anyDict:ASAny = dict;
+
+		anyDict[key] = 10;
+		equals(10, anyDict[key]);
+		equals(10, dict[key]);
+
+		anyDict[key] = 42;
+		equals(42, anyDict[key]);
+		equals(42, dict[key]);
+	}
+
+	function testArrayBaseIndexAccessViaASAny() {
+		var arr:ASAny = new ASArrayBase(11, 22, 33);
+
+		equals(22, arr[1]);
+		equals(33, arr["2"]);
+
+		arr[1] = 99;
+		arr["2"] = 77;
+
+		equals(99, arr[1]);
+		equals(77, arr["2"]);
+	}
+
+	function testArrayBasePropertyFallbackViaASAny() {
+		var arr:ASAny = new ASArrayBase(11, 22, 33);
+
+		equals(3, arr["length"]);
+		arr["length"] = 1;
+		equals(1, arr["length"]);
+		equals(11, arr[0]);
+	}
 }
 
 private class Cls {

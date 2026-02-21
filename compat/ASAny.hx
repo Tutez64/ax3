@@ -174,10 +174,54 @@ abstract ASAny(Dynamic)
 	@:op(a >= b) static function ___gte2(a:Float, b:ASAny):Bool return a >= b.___toFloat();
 	@:op(a <= b) static function ___lte2(a:Float, b:ASAny):Bool return a <= b.___toFloat();
 
-	@:op([]) inline function ___arrayGet(name:ASAny):ASAny return ___get(name);
-	@:op([]) inline function ___arraySet(name:ASAny, value:ASAny):ASAny return ___set(name, value);
+	@:op([]) function ___arrayGet(name:ASAny):ASAny {
+		if (Std.isOfType(this, ASArrayBase)) {
+			var index = parseArrayIndex(ASCompat.toString(name));
+			if (index != null) {
+				return (cast this : ASArrayBase).get(index);
+			}
+		}
+
+		// Preserve object keys for Dictionary access (important on cpp target).
+		var dict = ASDictionary.asDictionary(this);
+		if (dict != null) {
+			#if flash
+			return (cast this : ASDictionary<Dynamic, Dynamic>)[name];
+			#else
+			return (cast dict : haxe.Constraints.IMap<Dynamic, Dynamic>).get(name);
+			#end
+		}
+
+		return ASAny.getPropertyOrBoundMethod(this, ASCompat.toString(name));
+	}
+
+	@:op([]) function ___arraySet(name:ASAny, value:ASAny):ASAny {
+		if (Std.isOfType(this, ASArrayBase)) {
+			var index = parseArrayIndex(ASCompat.toString(name));
+			if (index != null) {
+				(cast this : ASArrayBase).set(index, value);
+				return value;
+			}
+		}
+
+		// Preserve object keys for Dictionary access (important on cpp target).
+		var dict = ASDictionary.asDictionary(this);
+		if (dict != null) {
+			#if flash
+			(cast this : ASDictionary<Dynamic, Dynamic>)[name] = value;
+			#else
+			(cast dict : haxe.Constraints.IMap<Dynamic, Dynamic>).set(name, value);
+			#end
+			return value;
+		}
+
+		return ASCompat.setProperty(this, ASCompat.toString(name), value);
+	}
 
 	static function parseArrayIndex(name:String):Null<Int> {
+		if (name == null) {
+			return null;
+		}
 		var length = name.length;
 		if (length == 0) {
 			return null;
